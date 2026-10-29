@@ -1,0 +1,10 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "regions": ["iad1"],
+  "crons": [
+    { "path": "/api/jobs/am", "schedule": "0 13 * * *" },
+    { "path": "/api/jobs/pm", "schedule": "0 2 * * *" }
+  ]
+}

@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.data/
+.env*
+!.env.example
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.DS_Store
+.vercel/
+src/app/.well-known/workflow/
+/.swc
+.vercel

@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: noticiero
+      POSTGRES_USER: noticiero
+      POSTGRES_PASSWORD: local-development-only
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - noticiero-postgres:/var/lib/postgresql/data
+volumes:
+  noticiero-postgres:
