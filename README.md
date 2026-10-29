@@ -2,9 +2,11 @@
 
 Un briefing personal de tecnología global: noticias, contexto empresarial y oportunidades con evidencia. Interfaz blanca, adaptable a móvil y con datos persistentes.
 
+Instancia personal: [noticiero-self.vercel.app](https://noticiero-self.vercel.app). Requiere la cuenta de GitHub autorizada. Este dominio principal permite entrar desde teléfono sin iniciar sesión adicionalmente en Vercel; las URL de despliegues y vistas previas conservan la protección de Vercel.
+
 ## Arrancar en local
 
-Requiere Node.js 22 o posterior. No necesita Docker ni credenciales para consultar las fuentes abiertas.
+Requiere Node.js 24.x. No necesita Docker ni credenciales para consultar las fuentes abiertas.
 
 ```bash
 npm install
