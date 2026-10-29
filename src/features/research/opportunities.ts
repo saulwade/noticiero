@@ -88,6 +88,5 @@ export function proposeLocalOpportunities(
           researchNoteId: note.id,
         },
       ];
-    })
-    .slice(0, 3);
+    });
 }

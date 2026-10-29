@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import { fetchExternal } from "@/lib/http";
 import { makeStory } from "@/features/news/normalize";
-import type { Story } from "@/lib/types";
+import type { Story, Category } from "@/lib/types";
 
 type Media = { $?: { url?: string }; url?: string };
 type FeedItem = {
@@ -26,6 +26,7 @@ export async function loadFeed(source: {
   id: string;
   name: string;
   url: string;
+  category?: Category;
 }): Promise<Story[]> {
   const response = await fetchExternal(source.url, [
     new URL(source.url).hostname,
@@ -37,7 +38,7 @@ export async function loadFeed(source: {
 }
 export async function parseFeed(
   raw: string,
-  source: { id: string; name: string },
+  source: { id: string; name: string; category?: Category },
 ): Promise<Story[]> {
   const feed = await parser.parseString(raw);
   const cutoff = Date.now() - 72 * 3600000;
@@ -59,6 +60,7 @@ export async function parseFeed(
       publishedAt: item.isoDate ?? item.pubDate,
       imageUrl: image,
     });
+    if (story && source.category) story.category = source.category;
     return story && Date.parse(story.publishedAt) >= cutoff ? [story] : [];
   });
 }

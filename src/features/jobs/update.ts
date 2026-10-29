@@ -30,7 +30,8 @@ import { updateQuote } from "@/features/market/alpha-vantage";
 import { getCompany } from "@/features/market/company-catalog";
 import { mapConcurrent } from "@/lib/http";
 import { hash } from "@/features/news/normalize";
-import { isTechnologyStory } from "@/features/news/relevance";
+import { isRelevantStory } from "@/features/news/relevance";
+import { reconcileOperations } from "@/features/operations/service";
 import { editionFor } from "@/lib/time";
 import type { JobRun, SourceState, Story } from "@/lib/types";
 
@@ -103,9 +104,10 @@ export async function collectNews(id: string): Promise<void> {
           const stories = fetched.filter(
             (story) =>
               ["ask-hn", "show-hn", "yc-rfs", "yc"].includes(story.sourceId) ||
-              isTechnologyStory(
+              isRelevantStory(
                 story.originalTitle ?? story.title,
                 story.excerpt,
+                story.sourceId,
               ),
           );
           const state: SourceState = {
@@ -312,6 +314,7 @@ export async function finishUpdate(id: string): Promise<void> {
       : job.message,
   });
   await db.delete(leases).where(eq(leases.token, id));
+  await reconcileOperations();
 }
 export async function failUpdate(id: string): Promise<void> {
   const job = await getJob(id);
@@ -325,6 +328,7 @@ export async function failUpdate(id: string): Promise<void> {
     });
   const db = await getDb();
   await db.delete(leases).where(eq(leases.token, id));
+  await reconcileOperations();
 }
 export async function runLocalUpdate(id: string) {
   try {

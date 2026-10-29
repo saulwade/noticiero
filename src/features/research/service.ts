@@ -1,4 +1,4 @@
-import { eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   researchModels,
@@ -7,25 +7,31 @@ import {
   opportunities,
   opportunityBatches,
   dailyReports,
+  opportunityEvents,
+  researchObservations,
 } from "@/db/schema";
 import { getStories } from "@/db/repository";
 import type { ResearchData } from "@/lib/types";
-import { trainModel } from "./vector";
+import { trainModel, keywords, terms } from "./vector";
 import { extractSignals, classifySignal } from "./signals";
 import { clusterSignals } from "./cluster";
 import { proposeLocalOpportunities } from "./opportunities";
 import { createDailyReport, localHour } from "./report";
 import { editionFor } from "@/lib/time";
 import { hash } from "@/features/news/normalize";
+import { recordOpportunity } from "./archive";
 
 export async function getResearchData(): Promise<ResearchData> {
   const db = await getDb();
-  const [models, notes, signals, reports] = await Promise.all([
-    db.select().from(researchModels).where(eq(researchModels.id, "local-v1")),
-    db.select().from(researchNotes),
-    db.select().from(researchSignals),
-    db.select().from(dailyReports),
-  ]);
+  const [models, notes, signals, reports, history, observations] =
+    await Promise.all([
+      db.select().from(researchModels).where(eq(researchModels.id, "local-v1")),
+      db.select().from(researchNotes),
+      db.select().from(researchSignals),
+      db.select().from(dailyReports),
+      db.select().from(opportunityEvents),
+      db.select().from(researchObservations),
+    ]);
   // Revalidate cached evidence when the explicit classifier improves; retain raw rows for audit.
   const accepted = signals.flatMap((row) => {
     const kind = classifySignal(row.data.quote);
@@ -70,8 +76,14 @@ export async function getResearchData(): Promise<ResearchData> {
     })
     .filter((note) => note.signalIds.length > 0);
   return {
+    observations: observations
+      .map((row) => row.data)
+      .sort((a, b) => b.at.localeCompare(a.at)),
     notes: currentNotes.sort((a, b) => b.lastSeen.localeCompare(a.lastSeen)),
     signals: accepted,
+    history: history
+      .map((row) => row.data)
+      .sort((a, b) => b.at.localeCompare(a.at)),
     reports: reports
       .map((row) => row.data)
       .sort((a, b) => b.date.localeCompare(a.date)),
@@ -104,13 +116,36 @@ export async function runLocalResearch(
   const notes = clusterSignals(previous.notes, signals, model, now);
   const ideas = proposeLocalOpportunities(notes, signals, now);
   const edition = editionFor(now);
-  const batches = await db
-    .select()
-    .from(opportunityBatches)
-    .where(like(opportunityBatches.key, `${edition.key}:%`));
-  const alreadyPublished = batches.some((batch) => batch.ideaIds.length > 0);
+  const observedIds = new Set(
+    (previous.observations ?? []).map((item) => item.id),
+  );
   await guard();
   await db.transaction(async (tx) => {
+    for (const story of stories.filter(
+      (story) => story.kind !== "comment" && story.kind !== "research",
+    )) {
+      const id = hash(`${story.id}:${story.contentHash}`);
+      if (observedIds.has(id)) continue;
+      const data = {
+        id,
+        storyId: story.id,
+        title: story.originalTitle ?? story.title,
+        excerpt: story.excerpt.slice(0, 600),
+        sourceName: story.sourceName,
+        url: story.url,
+        category: story.category,
+        keywords: keywords(
+          terms(`${story.originalTitle ?? story.title} ${story.excerpt}`),
+          model,
+          8,
+        ),
+        at: story.detectedAt,
+      };
+      await tx
+        .insert(researchObservations)
+        .values({ id: data.id, data })
+        .onConflictDoNothing();
+    }
     await tx
       .insert(researchModels)
       .values({ id: "local-v1", data: model })
@@ -126,19 +161,7 @@ export async function runLocalResearch(
         .values({ id: note.id, data: note })
         .onConflictDoUpdate({ target: researchNotes.id, set: { data: note } });
     for (const idea of ideas) {
-      const old = (
-        await tx
-          .select()
-          .from(opportunities)
-          .where(eq(opportunities.id, idea.id))
-      )[0]?.data;
-      const exists = Boolean(old);
-      if (alreadyPublished && !exists) continue;
-      const data = { ...idea, createdAt: old?.createdAt ?? idea.createdAt };
-      await tx
-        .insert(opportunities)
-        .values({ id: idea.id, data })
-        .onConflictDoUpdate({ target: opportunities.id, set: { data } });
+      await recordOpportunity(tx, idea, now.toISOString());
     }
     const key = `${edition.key}:local:${hash(
       signals
@@ -150,7 +173,7 @@ export async function runLocalResearch(
       .insert(opportunityBatches)
       .values({
         key,
-        ideaIds: alreadyPublished ? [] : ideas.map((idea) => idea.id),
+        ideaIds: ideas.map((idea) => idea.id),
       })
       .onConflictDoNothing();
   });

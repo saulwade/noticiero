@@ -3,6 +3,7 @@ import { parseEnv } from "node:util";
 import { PGlite } from "@electric-sql/pglite";
 import postgres from "postgres";
 import { migrations } from "../src/db/schema";
+import { backupColumns } from "../src/features/backups/format";
 
 // Run against a restored backup, never a second process on the live PGlite folder.
 const metadata = JSON.parse(
@@ -18,25 +19,9 @@ const target = postgres(connection, {
   prepare: false,
   connect_timeout: 15,
 });
-const tables = [
-  "stories",
-  "opportunities",
-  "quotes",
-  "quote_history",
-  "source_states",
-  "jobs",
-  "editions",
-  "saved_items",
-  "read_items",
-  "usage",
-  "settings",
-  "opportunity_batches",
-  "research_models",
-  "research_notes",
-  "research_signals",
-  "daily_reports",
-];
+const tables = Object.keys(backupColumns);
 try {
+  for (const statement of migrations) await source.exec(statement);
   for (const statement of migrations) await target.unsafe(statement);
   const counts: Record<string, number> = {};
   await target.begin(async (tx) => {

@@ -9,3 +9,18 @@ export function isTechnologyStory(title: string, excerpt = "") {
     return false;
   return technology.test(`${title} ${excerpt.slice(0, 240)}`);
 }
+const financeAndOperations =
+  /\b(finance|financial|banks?|banking|fintech|payments?|credit|loans?|lending|mortgage|inflation|interest rates?|federal reserve|stocks?|equities|bonds?|treasury|earnings|investing|insurance|payroll|bookkeeping|accounting|invoices?|inventory|logistics|supply chain|procurement|small business|smb|compliance|fraud|finanzas|financiero|banca|crédito|pymes|inventario|contabilidad|factura|nómina)\b/i;
+export function isRelevantStory(title: string, excerpt = "", sourceId = "") {
+  if (
+    /\b(coupons?|promo codes?|discount codes?|world series|super bowl|nba playoffs)\b/i.test(
+      title,
+    )
+  )
+    return false;
+  return (
+    ["fed", "banking-dive"].includes(sourceId) ||
+    isTechnologyStory(title, excerpt) ||
+    financeAndOperations.test(`${title} ${excerpt.slice(0, 600)}`)
+  );
+}

@@ -8,6 +8,13 @@ export function topicLabel(tokens: string[]) {
   if (set.has("ia") && (set.has("coste") || set.has("token")))
     return "Costos y control de uso de IA";
   if (set.has("factura")) return "Facturación y conciliación de documentos";
+  if (set.has("nomina")) return "Nómina y operaciones de personal";
+  if (set.has("pago") || set.has("banca") || set.has("credito"))
+    return "Pagos y acceso a servicios financieros";
+  if (set.has("contabilidad")) return "Contabilidad y conciliación";
+  if (set.has("inventario") || set.has("logistica"))
+    return "Inventario y logística de pequeñas empresas";
+  if (set.has("seguro")) return "Procesos de seguros";
   if (set.has("transcripcion") || set.has("reunion"))
     return "Seguimiento de reuniones y transcripciones";
   if (set.has("integracion")) return "Integraciones entre herramientas";

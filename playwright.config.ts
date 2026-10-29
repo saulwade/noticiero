@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-const baseURL = process.env.APP_URL ?? "http://127.0.0.1:3001";
+const baseURL = process.env.E2E_APP_URL ?? "http://127.0.0.1:3101";
 export default defineConfig({
   testDir: "./tests/e2e",
   use: { baseURL, trace: "retain-on-failure" },
@@ -18,9 +18,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run dev -- --port ${new URL(baseURL).port || "3001"}`,
+    command: "node --import tsx scripts/e2e-server.ts",
+    env: { E2E_PORT: new URL(baseURL).port || "3101" },
     url: baseURL,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 120000,
   },
 });

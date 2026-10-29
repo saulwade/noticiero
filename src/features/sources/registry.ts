@@ -1,5 +1,48 @@
 export const feeds = [
   {
+    id: "cnbc-finance",
+    name: "CNBC · Finanzas",
+    url: "https://www.cnbc.com/id/10000664/device/rss/rss.html",
+    site: "https://www.cnbc.com/finance/",
+    description: "Banca, mercados y servicios financieros.",
+    color: "#6b8b87",
+    initials: "CN",
+    category: "Finanzas",
+  },
+  {
+    id: "fed",
+    name: "Reserva Federal",
+    url: "https://www.federalreserve.gov/feeds/press_all.xml",
+    site: "https://www.federalreserve.gov",
+    description:
+      "Comunicados oficiales de política monetaria y supervisión bancaria; contexto regulatorio.",
+    color: "#8b9272",
+    initials: "FR",
+    category: "Finanzas",
+  },
+  {
+    id: "banking-dive",
+    name: "Banking Dive",
+    url: "https://www.bankingdive.com/feeds/news/",
+    site: "https://www.bankingdive.com",
+    description:
+      "Bancos, pagos, fintech y cambios en los servicios financieros.",
+    color: "#658f9a",
+    initials: "BD",
+    category: "Finanzas",
+  },
+  {
+    id: "smallbiz",
+    name: "Small Business Trends",
+    url: "https://smallbiztrends.com/feed/",
+    site: "https://smallbiztrends.com",
+    description:
+      "Procesos, herramientas y operaciones de pequeñas empresas; contexto editorial.",
+    color: "#a18e6a",
+    initials: "SB",
+    category: "Operaciones",
+  },
+  {
     id: "yc",
     name: "Y Combinator",
     url: "https://www.ycombinator.com/blog/feed",

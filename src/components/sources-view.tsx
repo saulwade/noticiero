@@ -264,7 +264,8 @@ export function SettingsView({ data }: { data: DashboardData }) {
         </div>
         <div className="schedule-row">
           <span>
-            Recopilación local<strong>Cada hora</strong>
+            {cfg.hosted ? "Recopilación en línea" : "Recopilación local"}
+            <strong>{cfg.hosted ? "07:00 y 20:00 CDMX" : "Cada hora"}</strong>
           </span>
           <span>
             Cierre nocturno<strong>Desde 20:00</strong>
@@ -272,7 +273,7 @@ export function SettingsView({ data }: { data: DashboardData }) {
         </div>
         <p className="settings-hint">
           {cfg.hosted
-            ? "Cron jobs de Vercel preparados. En Hobby, la ejecución puede ocurrir dentro de la hora programada."
+            ? "Dos tareas diarias de Vercel recopilan sin depender de tu laptop. En Hobby, la ejecución puede ocurrir dentro de la hora programada. Revisa los avisos en Estado y respaldos."
             : cfg.background
               ? "Servicio local activo: macOS mantiene el servidor y solicita una actualización cada hora. El cierre se guarda a partir de las 20:00 CDMX; si el equipo duerme, se recupera al volver a estar disponible. No recopila con el equipo apagado."
               : "Para activar el servidor y la recopilación en segundo plano en macOS, ejecuta npm run schedule:install. Los reportes usan la zona horaria de CDMX."}

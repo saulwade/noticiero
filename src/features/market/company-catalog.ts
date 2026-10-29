@@ -1,6 +1,34 @@
 import type { Company } from "@/lib/types";
 export const companies: Company[] = [
   {
+    symbol: "JPM",
+    name: "JPMorgan Chase",
+    aliases: ["jpmorgan", "jp morgan"],
+    color: "#7b8a98",
+    initials: "JP",
+  },
+  {
+    symbol: "BAC",
+    name: "Bank of America",
+    aliases: ["bank of america", "bofa"],
+    color: "#798c9d",
+    initials: "BA",
+  },
+  {
+    symbol: "V",
+    name: "Visa",
+    aliases: ["visa"],
+    color: "#7b88a0",
+    initials: "V",
+  },
+  {
+    symbol: "MA",
+    name: "Mastercard",
+    aliases: ["mastercard"],
+    color: "#a88e70",
+    initials: "MC",
+  },
+  {
     symbol: "NVDA",
     name: "NVIDIA",
     aliases: ["nvidia", "geforce", "cuda"],
@@ -119,10 +147,15 @@ export const companies: Company[] = [
 export function findCompanies(text: string): string[] {
   const normalized = text.toLowerCase();
   return companies
-    .filter((company) =>
-      company.aliases.some((alias) =>
-        new RegExp(`\\b${alias}\\b`, "i").test(normalized),
-      ),
+    .filter(
+      (company) =>
+        (company.symbol !== "V" ||
+          /\b(payments?|cards?|network|merchant|earnings|revenue|profit|fintech|stock)\b/i.test(
+            normalized,
+          )) &&
+        company.aliases.some((alias) =>
+          new RegExp(`\\b${alias}\\b`, "i").test(normalized),
+        ),
     )
     .map((company) => company.symbol);
 }

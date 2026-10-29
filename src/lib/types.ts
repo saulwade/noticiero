@@ -5,6 +5,8 @@ export const categories = [
   "Software",
   "Seguridad",
   "Negocios",
+  "Finanzas",
+  "Operaciones",
 ] as const;
 export type Category = (typeof categories)[number];
 export type SourceRef = { name: string; url: string; storyId?: string };
@@ -138,6 +140,83 @@ export type ResearchData = {
   reports: DailyReport[];
   documentsTracked: number;
   updatedAt?: string;
+  history?: OpportunityEvent[];
+  observations?: ResearchObservation[];
+};
+export type ResearchObservation = {
+  id: string;
+  storyId: string;
+  title: string;
+  excerpt: string;
+  sourceName: string;
+  url: string;
+  category: Category;
+  keywords: string[];
+  at: string;
+};
+export type OpportunityEvent = {
+  id: string;
+  opportunityId: string;
+  kind: "discovered" | "updated";
+  at: string;
+  idea: Opportunity;
+};
+export type ValidationProject = {
+  id: string;
+  title: string;
+  segment: string;
+  problem: string;
+  hypothesis: string;
+  successCriteria: string;
+  sources: { title: string; url: string }[];
+  opportunityId?: string;
+  opportunityEventId?: string;
+  opportunitySavedId?: string;
+  status: "explore" | "interviewing" | "pilot" | "archived";
+  createdAt: string;
+  updatedAt: string;
+};
+export type Interview = {
+  id: string;
+  projectId: string;
+  alias: string;
+  role: string;
+  date: string;
+  currentSolution: string;
+  frequency: string;
+  consequence: string;
+  quote: string;
+  notes: string;
+  nextStep: string;
+  status: "planned" | "completed";
+  createdAt: string;
+  updatedAt: string;
+};
+export type ValidationData = {
+  projects: ValidationProject[];
+  interviews: Interview[];
+};
+export type OperationAlert = {
+  id: string;
+  message: string;
+  firstSeen: string;
+  lastSeen: string;
+  resolvedAt?: string;
+};
+export type BackupRun = {
+  id: string;
+  status: "completed" | "failed";
+  at: string;
+  bytes?: number;
+  counts?: Record<string, number>;
+  sha256?: string;
+  runId?: string;
+};
+export type OperationsData = {
+  alerts: OperationAlert[];
+  backup?: BackupRun;
+  lastSuccessfulUpdate?: string;
+  repository?: string;
 };
 export type SourceState = {
   id: string;
@@ -197,5 +276,7 @@ export type DashboardData = {
     background?: boolean;
   };
   research?: ResearchData;
+  validation?: ValidationData;
+  operations?: OperationsData;
   demo: boolean;
 };

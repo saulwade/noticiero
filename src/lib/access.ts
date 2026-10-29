@@ -7,7 +7,13 @@ export function localHost(host: string | null): boolean {
   );
 }
 export function validCron(request: Request): boolean {
-  const expected = process.env.CRON_SECRET;
+  return validServiceSecret(request, "CRON_SECRET");
+}
+export function validServiceSecret(
+  request: Request,
+  key: "CRON_SECRET" | "OPS_MONITOR_SECRET" | "OPS_REPORT_SECRET",
+): boolean {
+  const expected = process.env[key];
   const received = request.headers.get("authorization");
   if (!expected || !received) return false;
   const a = Buffer.from(received),

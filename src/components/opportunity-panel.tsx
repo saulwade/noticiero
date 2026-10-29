@@ -18,6 +18,7 @@ export function IdeaCard({
   saved,
   onSave,
   onNote,
+  onValidate,
   compact = false,
 }: {
   idea: Opportunity;
@@ -25,6 +26,7 @@ export function IdeaCard({
   saved?: SavedItem;
   onSave: () => void;
   onNote: (note: string, state: SavedItem["state"]) => void;
+  onValidate?: () => void;
   compact?: boolean;
 }) {
   const [expanded, setExpanded] = useState(!compact);
@@ -55,6 +57,11 @@ export function IdeaCard({
         <ChevronDown size={15} className={expanded ? "rotated" : ""} />
       </button>
       <p className="idea-problem">{idea.problem}</p>
+      {onValidate ? (
+        <button className="small-button interview-start" onClick={onValidate}>
+          Preparar entrevistas <ArrowRight size={13} />
+        </button>
+      ) : null}
       <div className="idea-tags">
         <span>
           {idea.difficulty === "Baja"

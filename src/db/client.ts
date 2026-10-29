@@ -31,7 +31,11 @@ async function connect(): Promise<DB> {
     const dir = path.join(
       process.cwd(),
       ".data",
-      process.env.NODE_ENV === "test" ? "test-postgres" : "postgres",
+      process.env.NOTICIERO_E2E === "1"
+        ? "e2e-postgres"
+        : process.env.NODE_ENV === "test"
+          ? "test-postgres"
+          : "postgres",
     );
     await mkdir(dir, { recursive: true });
     db = pgliteDrizzle(new PGlite(dir), { schema });

@@ -25,12 +25,16 @@ import {
   Sparkles,
   Sun,
   X,
+  MessageSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { NewsCard } from "./news-card";
 import { CompanyPanel } from "./company-panel";
 import { IdeaCard, OpportunityPanel } from "./opportunity-panel";
 import { SettingsView, SourcesView } from "./sources-view";
 import { ResearchWorkspace } from "./research-workspace";
+import { ValidationWorkspace } from "./validation-workspace";
+import { OperationsView } from "./operations-view";
 import {
   categories,
   type Category,
@@ -43,11 +47,19 @@ import { dateLabel, relativeTime, editionFor } from "@/lib/time";
 import { storyMatches } from "@/lib/story-identity";
 import { savedArchive } from "@/lib/saved-archive";
 
-type View = "today" | "saved" | "ideas" | "sources" | "settings";
+type View =
+  | "today"
+  | "saved"
+  | "ideas"
+  | "sources"
+  | "settings"
+  | "validation"
+  | "operations";
 const navigation = [
   { id: "today" as const, label: "Mi briefing", icon: Newspaper },
   { id: "saved" as const, label: "Guardados", icon: Bookmark },
   { id: "ideas" as const, label: "Oportunidades", icon: Lightbulb },
+  { id: "validation" as const, label: "Entrevistas", icon: MessageSquare },
 ];
 const categoryColors: Record<Category, string> = {
   IA: "#759788",
@@ -56,12 +68,15 @@ const categoryColors: Record<Category, string> = {
   Software: "#7293ae",
   Seguridad: "#b1827c",
   Negocios: "#9c966d",
+  Finanzas: "#688f89",
+  Operaciones: "#b19771",
 };
 
 export function Dashboard({ initialData }: { initialData: DashboardData }) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [view, setView] = useState<View>("today");
+  const [validationProjectId, setValidationProjectId] = useState<string>();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | "Todas">("Todas");
   const [selectedId, setSelectedId] = useState<string>();
@@ -327,6 +342,39 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
     setMenuOpen(false);
     setMobileTab("news");
   }
+  async function prepareInterviews(
+    opportunityId: string,
+    eventId?: string,
+    savedId?: string,
+  ) {
+    if (data.demo) {
+      setToast("Abre tu espacio real para crear una investigación.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/validation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "from-opportunity",
+          opportunityId,
+          eventId,
+          savedId,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      await reload();
+      setValidationProjectId(result.projectId);
+      navigate("validation");
+    } catch (error) {
+      setToast(
+        error instanceof Error
+          ? error.message
+          : "No se pudo preparar la investigación.",
+      );
+    }
+  }
   const edition =
     slot === "latest"
       ? undefined
@@ -397,7 +445,9 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
       ? "Mis fuentes"
       : view === "settings"
         ? "Preferencias"
-        : navigation.find((item) => item.id === view)?.label;
+        : view === "operations"
+          ? "Estado y respaldos"
+          : navigation.find((item) => item.id === view)?.label;
 
   return (
     <div className="app-shell">
@@ -493,6 +543,16 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
             <Settings2 size={16} strokeWidth={1.6} />
             <span>Preferencias</span>
           </button>
+          <button
+            className={`nav-item ${view === "operations" ? "active" : ""}`}
+            onClick={() => navigate("operations")}
+          >
+            <ShieldCheck size={16} />
+            <span>Estado y respaldos</span>
+            {data.configuration.hosted && data.operations?.alerts.length ? (
+              <span className="nav-count">{data.operations.alerts.length}</span>
+            ) : null}
+          </button>
           <div className="sidebar-signoff">
             <span className="tiny-dot" /> Hecho para mentes curiosas.
           </div>
@@ -554,6 +614,16 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
             />
           ) : view === "settings" ? (
             <SettingsView data={data} />
+          ) : view === "operations" ? (
+            <OperationsView data={data} />
+          ) : view === "validation" ? (
+            <ValidationWorkspace
+              key={validationProjectId ?? "workspace"}
+              initialProjectId={validationProjectId}
+              data={data.validation ?? { projects: [], interviews: [] }}
+              onReload={reload}
+              demo={data.demo}
+            />
           ) : (
             <>
               <div className="page-heading">
@@ -588,7 +658,7 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                       ? "Tu colección de historias e ideas que vale la pena retomar."
                       : view === "ideas"
                         ? "Problemas concretos, hipótesis pequeñas y un siguiente paso."
-                        : "Tecnología, contexto y oportunidades. Todo lo que importa, sin el ruido."}
+                        : "Tecnología, finanzas y oportunidades. Todo lo que importa, sin el ruido."}
                   </p>
                 </div>
                 <div className="heading-decoration" aria-hidden="true">
@@ -784,6 +854,9 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                 <ResearchWorkspace
                   data={data}
                   query={query}
+                  onValidate={(id, eventId) =>
+                    void prepareInterviews(id, eventId)
+                  }
                   onNote={(id, note, state) =>
                     void saveNote(id, note, state, "note")
                   }
@@ -811,6 +884,7 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                           stories={data.stories}
                           saved={data.saved.find((s) => s.id === idea.id)}
                           onSave={() => void toggleSave(idea.id, "idea")}
+                          onValidate={() => void prepareInterviews(idea.id)}
                           onNote={(note, state) =>
                             void saveNote(idea.id, note, state)
                           }
@@ -965,6 +1039,13 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                               stories={data.stories}
                               saved={data.saved.find((s) => s.id === idea.id)}
                               onSave={() => void toggleSave(idea.id, "idea")}
+                              onValidate={() =>
+                                void prepareInterviews(
+                                  idea.id,
+                                  undefined,
+                                  idea.id,
+                                )
+                              }
                               onNote={(note, state) =>
                                 void saveNote(idea.id, note, state)
                               }

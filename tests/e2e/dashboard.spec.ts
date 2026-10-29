@@ -156,6 +156,22 @@ test("las APIs rechazan escrituras externas y cron sin secreto", async ({
   expect(external.status()).toBe(403);
   const cron = await request.get("/api/jobs/am");
   expect(cron.status()).toBe(401);
+  expect((await request.get("/api/operations/check")).status()).toBe(401);
+  expect(
+    (
+      await request.post("/api/operations/backup", {
+        data: { status: "completed" },
+      })
+    ).status(),
+  ).toBe(401);
+  expect(
+    (
+      await request.post("/api/validation", {
+        headers: { Origin: "https://outside.example.com" },
+        data: { action: "project" },
+      })
+    ).status(),
+  ).toBe(403);
   expect(
     (
       await request.post("/api/research/report", {
@@ -166,4 +182,85 @@ test("las APIs rechazan escrituras externas y cron sin secreto", async ({
   expect((await request.get("/api/research/reports/not-a-date")).status()).toBe(
     400,
   );
+});
+
+test("archivo automático y categorías de finanzas y operaciones", async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto("/?demo=1");
+  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: /^Oportunidades/ }).click();
+  await page.getByRole("button", { name: /Archivo automático/ }).click();
+  await expect(
+    page.getByText("Este archivo se llena solo", { exact: false }),
+  ).toBeVisible();
+  await page.getByLabel("Periodo del archivo automático").selectOption("7");
+  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
+  await expect(
+    page.getByRole("button", { name: "Finanzas", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Operaciones", exact: true }),
+  ).toBeVisible();
+});
+
+test("investigación y entrevista persisten al recargar", async ({
+  page,
+  isMobile,
+}, testInfo) => {
+  await page.goto("/");
+  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: "Entrevistas", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Nueva investigación", exact: true })
+    .click();
+  const title = `Conciliación ${testInfo.project.name}`;
+  await page.getByLabel("Nombre de la investigación").fill(title);
+  await page
+    .getByLabel("Segmento: ¿quién tiene el problema?")
+    .fill("Despachos contables pequeños");
+  await page
+    .getByLabel("Problema concreto")
+    .fill("Dedican horas a comparar facturas manualmente");
+  await page
+    .getByLabel("Hipótesis por comprobar")
+    .fill("Reducir el tiempo de conciliación");
+  await page
+    .getByRole("button", { name: "Guardar investigación", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Guardado");
+  await page.getByRole("button", { name: "Añadir entrevista" }).click();
+  await page.getByLabel("Persona o alias").fill("Entrevista de prueba");
+  await page
+    .getByLabel("¿Cómo resolvió el último caso?")
+    .fill("Una hoja de cálculo");
+  await page
+    .getByLabel("Tiempo, costo o consecuencia medible")
+    .fill("Dos horas cada semana");
+  await page
+    .getByLabel("Notas y evidencia que contradice la hipótesis")
+    .fill("Prefiere conservar su herramienta actual");
+  await page
+    .getByRole("button", { name: "Guardar entrevista", exact: true })
+    .click();
+  await expect(page.locator(".interview-card")).toContainText(
+    "Dos horas cada semana",
+  );
+  await page.reload();
+  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: "Entrevistas", exact: true }).click();
+  await page
+    .locator(".project-list")
+    .getByRole("button")
+    .filter({ hasText: title })
+    .click();
+  await expect(page.locator(".interview-card")).toContainText(
+    "Prefiere conservar su herramienta actual",
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

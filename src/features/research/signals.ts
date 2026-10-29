@@ -11,7 +11,7 @@ const workaround =
 const personal =
   /\b(i|we|my|our|anyone|yo|nosotros|mi|nuestro|alguien|busco|necesito|me)\b/i;
 const processContext =
-  /\b(tool\w*|app\w*|software|platform\w*|service\w*|account\w*|login|export\w*|import\w*|data|database\w*|code|coding|developer\w*|api\w*|ai|llm\w*|token\w*|invoice\w*|billing|payment\w*|bank\w*|budget\w*|cost\w*|pricing|spreadsheet\w*|record\w*|document\w*|file\w*|workflow\w*|automat\w*|manual\w*|integrat\w*|reconcil\w*|transcri\w*|meeting\w*|security|herramienta\w*|cuenta\w*|factura\w*|pago\w*|costo\w*|precio\w*|archivo\w*|proceso\w*|reunion\w*)\b/i;
+  /\b(tool\w*|app\w*|software|platform\w*|service\w*|account\w*|login|export\w*|import\w*|data|database\w*|code|coding|developer\w*|api\w*|ai|llm\w*|token\w*|invoice\w*|billing|payment\w*|bank\w*|credit|loan\w*|lending|insurance|payroll|bookkeeping|accounting|inventory|logistics|compliance|budget\w*|cost\w*|pricing|spreadsheet\w*|record\w*|document\w*|file\w*|workflow\w*|automat\w*|manual\w*|integrat\w*|reconcil\w*|transcri\w*|meeting\w*|security|herramienta\w*|cuenta\w*|factura\w*|pago\w*|costo\w*|precio\w*|archivo\w*|proceso\w*|reunion\w*)\b/i;
 const firstPersonBlock = /\b(?:i|we) (?:can['’]t|cannot)\b|\bno puedo\b/i;
 export function classifySignal(
   sentence: string,

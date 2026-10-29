@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { DashboardData, ResearchSignal, SavedItem } from "@/lib/types";
 import { editionFor } from "@/lib/time";
+import { ResearchArchive } from "./research-archive";
 
 export function ResearchWorkspace({
   data,
@@ -18,14 +19,18 @@ export function ResearchWorkspace({
   children,
   onNote,
   onReport,
+  onValidate,
 }: {
   data: DashboardData;
   query: string;
   children: React.ReactNode;
   onNote: (id: string, note: string, state: SavedItem["state"]) => void;
   onReport: () => Promise<void>;
+  onValidate: (id: string, eventId?: string) => void;
 }) {
-  const [tab, setTab] = useState<"ideas" | "notes" | "reports">("ideas");
+  const [tab, setTab] = useState<"ideas" | "notes" | "reports" | "archive">(
+    "ideas",
+  );
   const [generating, setGenerating] = useState(false);
   const research = data.research ?? {
     notes: [],
@@ -63,6 +68,11 @@ export function ResearchWorkspace({
             : "señales acumuladas"}
         </span>
       </div>
+      <p className="research-explanation auto-save-explanation">
+        Señales, palabras clave e hipótesis se conservan automáticamente en cada
+        actualización. El cierre nocturno añade el reporte del día. Guardar solo
+        destaca tus favoritos.
+      </p>
       <div
         className="research-tabs"
         role="group"
@@ -89,6 +99,13 @@ export function ResearchWorkspace({
           <FileText size={14} />
           Reportes nocturnos<span>{research.reports.length}</span>
         </button>
+        <button
+          className={tab === "archive" ? "active" : ""}
+          onClick={() => setTab("archive")}
+        >
+          <Layers size={14} />
+          Archivo automático<span>{research.history?.length ?? 0}</span>
+        </button>
       </div>
       {tab === "ideas" ? (
         <>
@@ -100,6 +117,13 @@ export function ResearchWorkspace({
             </button>
           ) : null}
         </>
+      ) : tab === "archive" ? (
+        <ResearchArchive
+          research={research}
+          query={query}
+          onValidate={onValidate}
+          demo={data.demo}
+        />
       ) : tab === "notes" ? (
         <div className="research-notes">
           <p className="research-explanation">

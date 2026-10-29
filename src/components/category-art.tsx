@@ -52,7 +52,9 @@ export function CategoryArt({
               </g>
             ))}
           </g>
-        ) : category === "Startups" ? (
+        ) : category === "Startups" ||
+          category === "Finanzas" ||
+          category === "Operaciones" ? (
           <g stroke="currentColor" strokeWidth="1.5">
             <path d="M94 148l39-38 27 18 61-68" />
             <path d="M198 60h23v24" />
@@ -99,9 +101,13 @@ export function CategoryArt({
       <span className="art-caption">
         {category === "Chips"
           ? "EL SIGUIENTE CIRCUITO"
-          : category === "Startups"
-            ? "IDEAS EN MOVIMIENTO"
-            : "TECNOLOGÍA EN PERSPECTIVA"}
+          : category === "Finanzas"
+            ? "SEÑALES EN LOS MERCADOS"
+            : category === "Operaciones"
+              ? "PROCESOS POR MEJORAR"
+              : category === "Startups"
+                ? "IDEAS EN MOVIMIENTO"
+                : "TECNOLOGÍA EN PERSPECTIVA"}
       </span>
     </div>
   );

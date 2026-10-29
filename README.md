@@ -1,6 +1,6 @@
 # Noticiero
 
-Un briefing personal de tecnología global: noticias, contexto empresarial y oportunidades con evidencia. Interfaz blanca, adaptable a móvil y con datos persistentes.
+Un briefing personal de tecnología, finanzas y operaciones de pequeñas empresas: noticias, contexto empresarial y oportunidades con evidencia. Interfaz blanca, adaptable a móvil y con datos persistentes.
 
 Instancia personal: [noticiero-self.vercel.app](https://noticiero-self.vercel.app). Requiere la cuenta de GitHub autorizada. Este dominio principal permite entrar desde teléfono sin iniciar sesión adicionalmente en Vercel; las URL de despliegues y vistas previas conservan la protección de Vercel.
 
@@ -22,6 +22,7 @@ La vista [/?demo=1](http://127.0.0.1:3001/?demo=1) permite explorar ejemplos ide
 ## Qué funciona sin claves
 
 - Recopilación de Hacker News, Ask HN, Show HN, respuestas públicas limitadas de esos hilos, Y Combinator (blog y Requests for Startups), Ars Technica, The Verge, TechCrunch y WIRED, según disponibilidad.
+- Finanzas y operaciones: CNBC Finance, Reserva Federal, Banking Dive y Small Business Trends mediante sus feeds publicados. Los comunicados y artículos son contexto; las señales de demanda se extraen de solicitudes/experiencias de personas, no de una noticia editorial.
 - Fechas originales, atribución, enlaces, extractos y fotos publicadas en feeds cuando existen; sin descargar páginas de suscripción.
 - Agrupación conservadora de duplicados, búsqueda, filtros por tema/edición, noticias leídas y guardados persistentes.
 - Empresas detectadas por menciones de su nombre o productos en el texto disponible, con catálogo de tickers y enlaces a Yahoo Finance. No se afirma que esas menciones demuestren impacto causal.
@@ -44,6 +45,36 @@ Los marcadores de versiones anteriores pueden seguir usando referencias hasta ca
 Persistencia no equivale a respaldo: borrar `.data/postgres` o perder el disco puede perder tus datos. Para una conservación duradera hay que respaldar la base y comprobar restauración. Al publicar en Vercel, debes migrar los datos locales a PostgreSQL externo; desplegar código no los traslada.
 
 Para discutir una noticia o idea conmigo, comparte su enlace y tus notas, o el reporte Markdown exportado. El dashboard todavía no incluye una conexión de chat automática.
+
+## Investigación automática e entrevistas
+
+Cada actualización conserva noticias nuevas, señales, palabras clave y notas del cuaderno sin abrir el dashboard ni marcar favoritos. Todas las oportunidades elegibles del motor local se guardan; el archivo automático conserva su descubrimiento y sus revisiones con la evidencia correspondiente. La repetición de dos autores públicos es un umbral de investigación, no validación comercial. No se promete una idea nueva en cada ejecución.
+
+Los temas y palabras clave de cada versión de noticia también se guardan en un registro permanente de contexto, aunque no produzcan una oportunidad. Ese registro es independiente del corpus temporal del modelo y no se elimina al pasar treinta días.
+
+En **Oportunidades → Archivo automático** puedes revisar hoy, los últimos 3, 7 o 30 días, o todo el historial almacenado. **Descargar investigación** exporta señales, palabras clave, anotaciones, revisiones y reportes del periodo en Markdown (hasta 90 días por archivo). Las fechas usan CDMX. El modelo estadístico tiene un corpus de trabajo acotado; ese límite no elimina el historial de investigación, entrevistas o favoritos.
+
+**Preparar entrevistas** crea o abre una investigación en **Entrevistas**. Si partes de una revisión histórica o un favorito, conserva esa copia concreta de hipótesis y fuentes. Define segmento, problema, hipótesis y criterio de éxito. Registra alias, rol, fecha, solución actual, frecuencia, consecuencia/costo, cita, contradicciones y siguiente paso. Los formularios personales requieren pulsar **Guardar investigación**, **Guardar entrevista** o **Guardar notas**; las señales y oportunidades generadas se guardan solas. Archivar una investigación conserva sus entrevistas. No se contacta a personas automáticamente.
+
+Para trabajar cada tres días: abre el archivo, descarga el periodo y pide revisar problemas repetidos, evidencia que contradice cada hipótesis y preguntas para entrevistas. En el chat local de este proyecto, Codex puede consultar los datos cuando lo solicites; guardar en la app no envía un mensaje al chat.
+
+## Respaldos automáticos y avisos
+
+Las plantillas en `ops/workflows/` se instalan en el repositorio privado de operaciones configurado por `OPS_REPOSITORY`. No son workflows activos en el repositorio público de la app. El respaldo corre diariamente a las 10:23 UTC (04:23 CDMX, sujeto a la cola de GitHub). El monitor independiente corre a las 15:37 y 04:37 UTC, después de las ventanas editoriales de la mañana y noche.
+
+Un rol PostgreSQL de solo lectura captura todas las tablas de contenido en una transacción consistente. El snapshot JSON versionado se comprime y cifra con AES-256-GCM antes de subirlo como artefacto privado. No incluye claves de entorno ni leases activos. Incluye noticias, señales, notas, revisiones, reportes, favoritos, entrevistas y configuración de fuentes. Se conservan siete días de **copias de respaldo**; el historial de la base no caduca a los siete días. El runner rechaza archivos cifrados mayores de 40 MB para mantener un margen de almacenamiento. Actions y artefactos consumen los cupos compartidos de GitHub; no se activa ningún upgrade ni servicio generativo.
+
+**Estado y respaldos** muestra la última edición, copia confirmada y avisos activos. Fallos, ediciones parciales, ventanas omitidas, ejecuciones detenidas y respaldos ausentes/vencidos generan avisos. El monitor también detecta que la web no responde. Mantiene una incidencia privada asignada al propietario y la cierra al recuperarse, sin publicar notas ni credenciales. La recepción de email depende de las preferencias de notificaciones de GitHub.
+
+Los secretos operativos se guardan en GitHub Secrets: `BACKUP_DATABASE_URL` (solo lectura), `BACKUP_ENCRYPTION_KEY`, `OPS_MONITOR_SECRET` y `OPS_REPORT_SECRET`. Solo los últimos dos y `OPS_REPOSITORY` se necesitan en Vercel. La clave de recuperación también se conserva en un archivo local privado fuera de Git; guarda una copia en tu gestor de contraseñas.
+
+Para restaurar, descarga el artefacto cifrado y carga la clave en `BACKUP_ENCRYPTION_KEY` desde tu almacén privado, sin pegarla en un comando que quede en el historial. Puedes verificar una restauración sin tocar la base actual:
+
+```bash
+node --import tsx scripts/restore-backup.ts /ruta/al/respaldo.enc /ruta/nueva/de/verificacion
+```
+
+El segundo argumento debe ser una carpeta nueva y crea PGlite temporal. Para restaurar en PostgreSQL, omite esa carpeta y establece `RESTORE_DATABASE_URL` a un destino vacío. La restauración autentica el cifrado, comprueba tablas y recuentos, y rechaza cualquier destino con datos, incluyendo leases. La clave correcta es necesaria para recuperar una copia cifrada.
 
 ## Activar redacción generativa opcional
 
@@ -116,7 +147,7 @@ npm run test:e2e
 npm run build
 ```
 
-Las pruebas E2E usan Google Chrome local y un servidor en loopback. Las pruebas unitarias/integración usan `.data/test-postgres`, separada de tus datos. Las pruebas de navegación utilizan ejemplos o respuestas de prueba identificadas para ser reproducibles.
+Las pruebas E2E usan Google Chrome local, el build de producción y un servidor aislado en `127.0.0.1:3101`, con `.data/e2e-postgres` temporal. Compila antes con `npm run build`. Las pruebas unitarias/integración usan `.data/test-postgres`, separada de tus datos. Las pruebas de navegación utilizan ejemplos identificados y registros sintéticos en esa base temporal.
 
 ## Estructura
 

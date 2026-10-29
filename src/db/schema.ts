@@ -17,6 +17,12 @@ import type {
   ResearchNote,
   ResearchSignal,
   DailyReport,
+  OpportunityEvent,
+  ValidationProject,
+  Interview,
+  OperationAlert,
+  BackupRun,
+  ResearchObservation,
 } from "@/lib/types";
 
 export const stories = pgTable("stories", {
@@ -86,6 +92,30 @@ export const dailyReports = pgTable("daily_reports", {
   date: text("date").primaryKey(),
   data: jsonb("data").$type<DailyReport>().notNull(),
 });
+export const opportunityEvents = pgTable("opportunity_events", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<OpportunityEvent>().notNull(),
+});
+export const researchObservations = pgTable("research_observations", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<ResearchObservation>().notNull(),
+});
+export const validationProjects = pgTable("validation_projects", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<ValidationProject>().notNull(),
+});
+export const interviews = pgTable("interviews", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<Interview>().notNull(),
+});
+export const operationAlerts = pgTable("operation_alerts", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<OperationAlert>().notNull(),
+});
+export const backupRuns = pgTable("backup_runs", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<BackupRun>().notNull(),
+});
 
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
@@ -106,4 +136,15 @@ export const migrations = [
   `CREATE TABLE IF NOT EXISTS research_notes (id text PRIMARY KEY, data jsonb NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS research_signals (id text PRIMARY KEY, data jsonb NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS daily_reports (date text PRIMARY KEY, data jsonb NOT NULL)`,
+  ...[
+    "opportunity_events",
+    "research_observations",
+    "validation_projects",
+    "interviews",
+    "operation_alerts",
+    "backup_runs",
+  ].map(
+    (name) =>
+      `CREATE TABLE IF NOT EXISTS ${name} (id text PRIMARY KEY, data jsonb NOT NULL)`,
+  ),
 ];

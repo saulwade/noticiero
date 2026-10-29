@@ -71,6 +71,18 @@ export function classify(text: string): Category {
   )
     return "Seguridad";
   if (
+    /\b(finance|financial|bank|banks|banking|payments?|lending|loan|loans|credit|mortgage|inflation|interest rates?|federal reserve|fintech|finanzas|financiero|banca|crédito)\b/i.test(
+      text,
+    )
+  )
+    return "Finanzas";
+  if (
+    /\b(payroll|bookkeeping|inventory|logistics|supply chain|procurement|small business|smb|pymes|nómina|inventario|contabilidad|conciliación|logística)\b/i.test(
+      text,
+    )
+  )
+    return "Operaciones";
+  if (
     /\b(startup|funding|raises|seed|series [a-d]|show hn|launch)\b/i.test(text)
   )
     return "Startups";

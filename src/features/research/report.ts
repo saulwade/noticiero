@@ -8,7 +8,7 @@ import type {
 import { hash } from "@/features/news/normalize";
 import { editionFor, TIME_ZONE } from "@/lib/time";
 import { proposeLocalOpportunities } from "./opportunities";
-import { isTechnologyStory } from "@/features/news/relevance";
+import { isRelevantStory } from "@/features/news/relevance";
 import { groupStories, rankStories } from "@/features/news/deduplicate";
 
 const clean = (text: string) =>
@@ -99,7 +99,11 @@ export function createDailyReport(
       documents.filter(
         (story) =>
           !["comment", "research", "question"].includes(story.kind ?? "news") &&
-          isTechnologyStory(story.originalTitle ?? story.title, story.excerpt),
+          isRelevantStory(
+            story.originalTitle ?? story.title,
+            story.excerpt,
+            story.sourceId,
+          ),
       ),
     ),
     new Date(`${date}T23:59:59-06:00`).getTime(),
