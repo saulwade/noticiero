@@ -4,13 +4,20 @@ import {
   AlertCircle,
   Database,
   Clock3,
+  RefreshCw,
 } from "lucide-react";
 import type { DashboardData } from "@/lib/types";
 const date = (at?: string) =>
   at
     ? new Date(at).toLocaleString("es-MX", { timeZone: "America/Mexico_City" })
     : "Sin confirmar";
-export function OperationsView({ data }: { data: DashboardData }) {
+export function OperationsView({
+  data,
+  onRefresh,
+}: {
+  data: DashboardData;
+  onRefresh: () => void;
+}) {
   const ops = data.operations;
   const repository = ops?.repository;
   const safeRepo =
@@ -27,6 +34,16 @@ export function OperationsView({ data }: { data: DashboardData }) {
           <em>Todo a la vista.</em>
         </h1>
         <p>Actualizaciones, respaldo independiente y avisos de recuperación.</p>
+      </div>
+      <div className="workspace-actions">
+        <button
+          className="small-button"
+          onClick={onRefresh}
+          disabled={data.demo}
+        >
+          <RefreshCw size={14} />
+          Actualizar estado
+        </button>
       </div>
       {!data.configuration.hosted ? (
         <p className="workspace-notice">

@@ -3,6 +3,7 @@ import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
 import { recordOpportunity } from "@/features/research/archive";
 import { getResearchData } from "@/features/research/service";
+import { researchBrief } from "@/features/research/brief";
 import { findCompanies } from "@/features/market/company-catalog";
 import { runLocalResearch } from "@/features/research/service";
 import { saveStory } from "@/db/repository";
@@ -50,6 +51,11 @@ describe("archivo automático de oportunidades", () => {
     expect(research.observations).toHaveLength(2);
     expect(research.observations?.[0].keywords.length).toBeGreaterThan(0);
     expect(research.observations?.[0].title).toBe(story.title);
+    const brief = await researchBrief(90, now);
+    expect(brief).toContain("Banking Dive");
+    expect(brief.indexOf("## Temas y palabras clave")).toBeLessThan(
+      brief.indexOf("## Cuaderno:"),
+    );
   });
   it("incorpora nuevas oportunidades en una segunda actualización de la misma edición sin favoritos", async () => {
     const db = await getDb();

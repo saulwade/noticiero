@@ -11,8 +11,8 @@
 - [x] Validación: tablas validation_projects/interviews, esquema Zod y repositorio, API autenticada/mismo origen, vista con formularios y relación con oportunidades. Probar persistencia, referencias y validación de campos.
 - [x] Salud: tablas operation_alerts/backup_runs, evaluación pura de plazos y fallos, reconciliación y rutas con secretos limitados. Mostrar estados y enlaces a operaciones. Probar fallos, ausencias y recuperación.
 - [x] Respaldo: listado completo de tablas, snapshot consistente, gzip+AES-GCM, manifiesto y restauración solo en destino vacío. Probar corrupción, clave incorrecta, omisión de tablas y restauración a PGlite temporal.
-- [ ] Automatización: workflows privados de respaldo diario y watchdog tras cada ventana, acciones oficiales fijadas a commits, avisos deduplicados mediante incidencia privada. Crear rol de lectura, secretos y repositorio privado; probar workflow_dispatch y restaurar artefacto descargado.
-- [ ] Verificación/publicación: lint, TypeScript, pruebas de integración y E2E, build, revisión independiente, despliegue y comprobación real; documentar costes, recuperación y uso diario/por tres días.
+- [x] Automatización: workflows privados de respaldo diario y watchdog tras cada ventana, acciones oficiales fijadas a commits, avisos deduplicados mediante incidencia privada. Crear rol de lectura, secretos y repositorio privado; probar workflow_dispatch y restaurar artefacto descargado.
+- [x] Verificación/publicación: lint, TypeScript, pruebas de integración y E2E, build, revisión independiente, despliegue y comprobación real; documentar costes, recuperación y uso diario/por tres días.
 
 Archivos principales: src/lib/types.ts, src/db/schema.ts, src/features/research/{service,opportunities,archive}.ts, src/features/validation/_, src/features/operations/_, src/features/backups/_, src/components/{research-workspace,validation-workspace,operations-view,dashboard}.tsx, src/features/{sources,news}/_, scripts/{backup,restore-backup,notify-ops}.ts, ops/workflows/*.yml y pruebas correspondientes.
 
@@ -21,3 +21,7 @@ Contratos: `recordOpportunity(idea, observedAt, db)` persiste revisión por hash
 ## Verificación antes de publicar
 
 76 pruebas unitarias/integración aprobadas, incluidas conservación de contextos fuera del corpus, archivo idempotente, concurrencia al crear investigaciones, copia histórica/favorita y restauración cifrada. 18 E2E de escritorio/móvil aprobadas con base temporal. Lint, TypeScript y build aprobados. La revisión independiente encontró tres P2 (parcialidad sin aviso, duplicación concurrente y selección de revisión histórica), corregidos y comprobados con regresiones y revisión posterior. Las pruebas de contextos históricos fallaron antes del arreglo y pasaron después.
+
+## Comprobaciones en producción
+
+Publicado en noticiero-self.vercel.app. Actualización real: trece fuentes correctas y 254 contextos archivados; cinco señales acumuladas, sin hipótesis publicadas por falta de repetición. Repositorio privado saulwade/noticiero-ops, workflows activos, rol de lectura comprobado en todas las tablas y secretos configurados. Respaldo real 40950458485 completado: 240176 bytes cifrados, 22 tablas y 679 registros. Artefacto descargado y restaurado en PGlite temporal con todos los recuentos completos. Ensayo de aviso 40950948682 abrió una única incidencia privada asignada al propietario. Comprobación real 40951170665 terminó correctamente y cerró automáticamente la incidencia 1.

@@ -203,6 +203,16 @@ test("archivo automático y categorías de finanzas y operaciones", async ({
   await expect(
     page.getByRole("button", { name: "Operaciones", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: /^Estado y respaldos/ }).click();
+  await expect(page.locator(".operations-view")).toContainText("siete días");
+  await expect(
+    page.getByRole("button", { name: "Actualizar estado", exact: true }),
+  ).toBeDisabled();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });
 
 test("investigación y entrevista persisten al recargar", async ({

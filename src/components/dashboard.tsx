@@ -615,7 +615,14 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
           ) : view === "settings" ? (
             <SettingsView data={data} />
           ) : view === "operations" ? (
-            <OperationsView data={data} />
+            <OperationsView
+              data={data}
+              onRefresh={() =>
+                void reload().catch(() =>
+                  setToast("No se pudo consultar el estado. Intenta de nuevo."),
+                )
+              }
+            />
           ) : view === "validation" ? (
             <ValidationWorkspace
               key={validationProjectId ?? "workspace"}
@@ -1103,7 +1110,7 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
             <span>
               noticiero<span>·</span>Una perspectiva propia.
             </span>
-            <span>Tecnología global · Español · CDMX</span>
+            <span>Tecnología y finanzas · Español · CDMX</span>
             {!data.stories.length && !data.demo ? (
               <Link href="/?demo=1">
                 Explorar ejemplo

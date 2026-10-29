@@ -104,7 +104,11 @@ export function ResearchWorkspace({
           onClick={() => setTab("archive")}
         >
           <Layers size={14} />
-          Archivo automático<span>{research.history?.length ?? 0}</span>
+          Archivo automático
+          <span>
+            {(research.history?.length ?? 0) +
+              (research.observations?.length ?? 0)}
+          </span>
         </button>
       </div>
       {tab === "ideas" ? (
