@@ -8,7 +8,7 @@ Diseño: cada nuevo guardado conservará una copia del contenido ya disponible e
 - [x] Mostrar las copias en Guardados, independientemente del filtro actual de oportunidades y sin el límite de 60 del feed.
 - [x] Probar reejecución, cambio y rechazo de evidencia, conservación de notas y navegación móvil.
 - [x] Revisar cuenta Vercel, almacenamiento PostgreSQL externo y horarios compatibles con el plan gratuito.
-- [ ] Completar las credenciales del acceso privado de GitHub y publicar la versión de producción.
+- [x] Completar las credenciales del acceso privado de GitHub y publicar la versión de producción.
 
 Almacenamiento actual: PostgreSQL integrado en .data/postgres, servido por una sola instancia local. No abrir esa carpeta desde otro proceso mientras el servicio esté activo. Una publicación necesita migrar los datos a PostgreSQL externo y conservar un respaldo; subir código no migra datos.
 
@@ -16,6 +16,6 @@ Almacenamiento actual: PostgreSQL integrado en .data/postgres, servido por una s
 
 Proyecto Vercel creado y vinculado: saul-wades-projects/noticiero. Neon Free provisionado (free_v3), región iad1, conexión configurada solo en Production y Preview. Tras aceptación de términos y autorización explícita del usuario, se migró el respaldo completo y se verificaron los recuentos de todas las tablas. No se transfirieron leases activos. El respaldo .data/backups/noticiero-20261029T060426Z.tgz se restauró en una carpeta temporal independiente para comprobar su lectura.
 
-Guardados: 57 pruebas unitarias/integración aprobadas; lint y compilación con comprobación TypeScript aprobados. La regresión de marcadores antiguos se comprobó fallando antes del arreglo y pasando después. La suite E2E de escritorio/móvil contiene 14 pruebas. Se corrigió un problema del lockfile de dependencias opcionales WASM detectado por npm ci en Linux. Vercel confirmó la vista previa como Ready.
+Guardados: 57 pruebas unitarias/integración y 14 E2E de escritorio/móvil aprobadas; lint y compilación con comprobación TypeScript aprobados. La regresión de marcadores antiguos se comprobó fallando antes del arreglo y pasando después. Se corrigió un problema del lockfile de dependencias opcionales WASM detectado por npm ci en Linux. Vercel confirmó la versión de producción como Ready.
 
-Pendiente de publicación completa: registrar la OAuth App de GitHub y guardar AUTH_GITHUB_ID y AUTH_GITHUB_SECRET para el acceso privado. Hasta entonces el entorno alojado exige autenticación y no muestra datos.
+Producción: https://noticiero-saul-wades-projects.vercel.app, repositorio https://github.com/saulwade/noticiero conectado con la rama main. Credenciales OAuth configuradas como sensibles en Production y Preview. El usuario autorizó el acceso de lectura de perfil y correos y se comprobó el inicio de sesión real. Una actualización alojada terminó con las nueve fuentes en estado correcto y nueve noticias añadidas. Se comprobó un guardado en Neon, su persistencia tras recargar y su visualización en el archivo; después se retiró el marcador de prueba. Las dos tareas cron están activas, a las 13:00 y 02:00 UTC (07:00 y 20:00 CDMX, con precisión de una hora en Hobby). El análisis permanece en modo local, sin llamadas a proveedores de IA de pago.
