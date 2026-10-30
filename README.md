@@ -32,7 +32,7 @@ La vista [/?demo=1](http://127.0.0.1:3001/?demo=1) permite explorar ejemplos ide
 - Oportunidades cuando al menos dos autores públicos distintos describen necesidades relacionadas. Una cuenta no equivale a un cliente verificado. YC RFS es contexto editorial y no cuenta como demanda.
 - Reportes por fecha, con noticias de la jornada, señales nuevas, evidencia e hipótesis; lectura y exportación Markdown en Oportunidades → Reportes nocturnos.
 
-El modo predeterminado `ANALYSIS_MODE=local` no realiza llamadas a APIs de IA, aunque existan credenciales configuradas. El costo de API es **$0**; el equipo consume electricidad, almacenamiento y conexión. El modelo estadístico mantiene hasta 2,000 documentos y analiza un corpus reciente de hasta 30 días, conservando las notas y evidencia históricas. Aprende frecuencias de términos, no entrena un modelo de lenguaje ni busca en toda la web.
+El modo predeterminado `ANALYSIS_MODE=local` no realiza llamadas a APIs de IA, aunque existan credenciales configuradas. El costo de API es **$0**; la infraestructura consume almacenamiento y conexión. El modelo estadístico mantiene hasta 2,000 documentos; incorpora al modelo documentos observados en los últimos 30 días y conserva los anteriores hasta desplazarlos por capacidad. La extracción de señales revisa las publicaciones comunitarias almacenadas, independientemente de ese límite, para recuperar evidencia pendiente cuando mejoran las reglas. Aprende frecuencias de términos, no entrena un modelo de lenguaje ni busca en toda la web.
 
 Los titulares, extractos y citas permanecen en su idioma original; se etiquetan como **Extracto original** o **Solo titular**. Las hipótesis y explicaciones locales usan español. La traducción generativa requiere un modelo opcional. No se inventan cotizaciones ni clientes para llenar la pantalla.
 
@@ -51,6 +51,8 @@ Para discutir una noticia o idea conmigo, comparte su enlace y tus notas, o el r
 Cada actualización conserva noticias nuevas, señales, palabras clave y notas del cuaderno sin abrir el dashboard ni marcar favoritos. Todas las oportunidades elegibles del motor local se guardan; el archivo automático conserva su descubrimiento y sus revisiones con la evidencia correspondiente. La repetición de dos autores públicos es un umbral de investigación, no validación comercial. No se promete una idea nueva en cada ejecución.
 
 Los temas y palabras clave de cada versión de noticia también se guardan en un registro permanente de contexto, aunque no produzcan una oportunidad. Ese registro es independiente del corpus temporal del modelo y no se elimina al pasar treinta días.
+
+Las señales nuevas pueden reforzar un cuaderno iniciado meses antes. Se acumulan citas, autores públicos distintos y fechas de actividad; varias intervenciones de la misma cuenta no cuentan como varios clientes. El motor no modifica sus reglas por sí solo ni aprende automáticamente de entrevistas o de decisiones personales. No ejecuta un análisis semanal/mensual separado: los periodos se revisan mediante el archivo y sus exportaciones. Más datos pueden aportar evidencia útil, sin garantizar más oportunidades ni que cada agrupación sea correcta.
 
 En **Oportunidades → Archivo automático** puedes revisar hoy, los últimos 3, 7 o 30 días, o todo el historial almacenado. **Descargar investigación** exporta señales, palabras clave, anotaciones, revisiones y reportes del periodo en Markdown (hasta 90 días por archivo). Las fechas usan CDMX. El modelo estadístico tiene un corpus de trabajo acotado; ese límite no elimina el historial de investigación, entrevistas o favoritos.
 
@@ -113,7 +115,7 @@ Instala dos servicios de usuario en `~/Library/LaunchAgents`: `local.noticiero.s
 
 Los servicios fuerzan `ANALYSIS_MODE=local`, usan rutas absolutas y guardan sus logs en `.data/server.log`, `.data/server-error.log`, `.data/schedule.log` y `.data/schedule-error.log`. Los archivos se pueden inspeccionar sin instalar con `npm run schedule:generate`. No contienen credenciales.
 
-El reporte se guarda durante las actualizaciones desde las **20:00 CDMX**. Se actualiza con observaciones posteriores de esa misma jornada; un corte manual anterior es provisional. Al reanudar se completa el cierre pendiente del día anterior si hay documentos o un corte provisional. Los cierres históricos ya completos se conservan como snapshots. No se promete ejecución al minuto exacto.
+El reporte se guarda durante las actualizaciones desde las **20:00 CDMX**. Se actualiza con observaciones posteriores de esa misma jornada; un corte manual anterior es provisional. Al reanudar se recuperan todos los días anteriores con datos guardados y un cierre ausente o provisional. No se inventan noticias de días sin recopilación. Los cierres históricos ya completos se conservan como snapshots. No se promete ejecución al minuto exacto.
 
 Requiere sesión de macOS iniciada y computadora disponible. No recopila con el equipo apagado o dormido; al volver se retoma la consulta. Para actualizar el código, desinstala temporalmente los servicios, recompila y vuelve a instalarlos.
 

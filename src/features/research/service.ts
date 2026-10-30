@@ -108,7 +108,9 @@ export async function runLocalResearch(
     .slice(0, 2000);
   const model = trainModel(modelRows[0]?.data, corpus, now);
   const known = new Map(previous.signals.map((signal) => [signal.id, signal]));
-  const fresh = corpus
+  // The model's bounded working corpus must not limit evidence extraction.
+  // This also recovers older statements when classification rules improve.
+  const fresh = stories
     .flatMap((story) => extractSignals(story, now))
     .filter((signal) => !known.has(signal.id));
   for (const signal of fresh) known.set(signal.id, signal);
@@ -181,20 +183,23 @@ export async function runLocalResearch(
     await guard();
     await saveDailyReport(edition.date, now);
   }
-  // Recover the previous night's report after a suspended/offline Mac resumes.
-  const yesterday = editionFor(new Date(now.getTime() - 86400000)).date;
-  const previousReport = previous.reports.find(
-    (report) => report.date === yesterday,
+  // Recover every stored day with missing/provisional coverage after downtime.
+  // Empty days have no captured evidence and must not be invented.
+  const reportsByDate = new Map(
+    previous.reports.map((report) => [report.date, report]),
   );
-  if (
-    (!previousReport || previousReport.provisional) &&
-    (previousReport ||
-      stories.some(
-        (story) => editionFor(new Date(story.detectedAt)).date === yesterday,
-      ))
-  ) {
+  const capturedDates = new Set([
+    ...stories.map((story) => editionFor(new Date(story.detectedAt)).date),
+    ...signals.map((signal) => editionFor(new Date(signal.detectedAt)).date),
+    ...previous.reports
+      .filter((report) => report.provisional)
+      .map((report) => report.date),
+  ]);
+  for (const date of [...capturedDates].sort()) {
+    const report = reportsByDate.get(date);
+    if (date >= edition.date || (report && !report.provisional)) continue;
     await guard();
-    await saveDailyReport(yesterday, now);
+    await saveDailyReport(date, now);
   }
 }
 export async function saveDailyReport(

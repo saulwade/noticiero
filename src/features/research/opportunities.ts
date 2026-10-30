@@ -12,13 +12,17 @@ export function proposeLocalOpportunities(
       const members = note.signalIds.flatMap((id) =>
         byId.get(id) ? [byId.get(id)!] : [],
       );
-      const byVoice = [
-        ...new Map(
-          members
-            .filter((signal) => signal.author)
-            .map((signal) => [signal.independenceKey, signal]),
-        ).values(),
-      ];
+      const representatives = new Map<string, ResearchSignal>();
+      for (const signal of members.filter((member) => member.author)) {
+        const previous = representatives.get(signal.independenceKey);
+        // A later workaround must not hide this person's explicit need.
+        if (
+          !previous ||
+          (previous.kind === "workaround" && signal.kind !== "workaround")
+        )
+          representatives.set(signal.independenceKey, signal);
+      }
+      const byVoice = [...representatives.values()];
       if (
         byVoice.length < 2 ||
         !byVoice.some(
