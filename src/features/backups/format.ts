@@ -7,6 +7,10 @@ import {
 import { gzipSync, gunzipSync } from "node:zlib";
 
 export const backupColumns: Record<string, string[]> = {
+  evidence_records: ["id", "data"],
+  evidence_reviews: ["id", "data"],
+  evidence_connectors: ["id", "data"],
+  evidence_reports: ["id", "data"],
   stories: ["id", "url", "data"],
   opportunities: ["id", "data"],
   quotes: ["symbol", "data"],
@@ -49,7 +53,7 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
     data.version !== 1 ||
     !Number.isFinite(Date.parse(data.createdAt)) ||
     !Array.isArray(data.tables) ||
-    data.tables.length !== Object.keys(backupColumns).length
+    ![22, Object.keys(backupColumns).length].includes(data.tables.length)
   )
     throw new Error("Formato de respaldo incompatible.");
   const names = new Set<string>();
@@ -85,6 +89,15 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
       }
     }
   }
+  const required = Object.keys(backupColumns).filter(
+    (name) => !name.startsWith("evidence_"),
+  );
+  if (
+    required.some((name) => !names.has(name)) ||
+    (data.tables.length !== 22 &&
+      Object.keys(backupColumns).some((name) => !names.has(name)))
+  )
+    throw new Error("Faltan tablas de respaldo.");
   return data;
 }
 export function sealBackup(snapshot: BackupSnapshot, key: string) {

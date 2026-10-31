@@ -256,6 +256,7 @@ export type SavedItem = {
     { kind: "story"; story: Story } | { kind: "idea"; idea: Opportunity };
 };
 export type DashboardData = {
+  evidence?: import("@/features/evidence/types").EvidenceData;
   stories: Story[];
   quotes: Quote[];
   opportunities: Opportunity[];

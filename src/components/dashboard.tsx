@@ -35,6 +35,7 @@ import { SettingsView, SourcesView } from "./sources-view";
 import { ResearchWorkspace } from "./research-workspace";
 import { ValidationWorkspace } from "./validation-workspace";
 import { OperationsView } from "./operations-view";
+import { EvidenceWorkspace } from "./evidence-workspace";
 import {
   categories,
   type Category,
@@ -54,11 +55,13 @@ type View =
   | "sources"
   | "settings"
   | "validation"
-  | "operations";
+  | "operations"
+  | "evidence";
 const navigation = [
   { id: "today" as const, label: "Mi briefing", icon: Newspaper },
   { id: "saved" as const, label: "Guardados", icon: Bookmark },
   { id: "ideas" as const, label: "Oportunidades", icon: Lightbulb },
+  { id: "evidence" as const, label: "Radar de problemas", icon: Compass },
   { id: "validation" as const, label: "Entrevistas", icon: MessageSquare },
 ];
 const categoryColors: Record<Category, string> = {
@@ -622,6 +625,32 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                   setToast("No se pudo consultar el estado. Intenta de nuevo."),
                 )
               }
+            />
+          ) : view === "evidence" ? (
+            <EvidenceWorkspace
+              data={
+                data.evidence ?? {
+                  records: [],
+                  reviews: [],
+                  dossiers: [],
+                  sources: [],
+                  reports: [],
+                  totalRecords: 0,
+                  storageLimited: false,
+                }
+              }
+              demo={data.demo}
+              onRefresh={reload}
+              onProject={(id) => {
+                setValidationProjectId(id);
+                void reload()
+                  .then(() => navigate("validation"))
+                  .catch(() =>
+                    setToast(
+                      "No se pudo abrir la investigación. Intenta de nuevo.",
+                    ),
+                  );
+              }}
             />
           ) : view === "validation" ? (
             <ValidationWorkspace

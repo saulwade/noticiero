@@ -24,6 +24,29 @@ import type {
   BackupRun,
   ResearchObservation,
 } from "@/lib/types";
+import type {
+  EvidenceRecord,
+  EvidenceReview,
+  ConnectorState,
+  EvidenceWeeklyReport,
+} from "@/features/evidence/types";
+
+export const evidenceRecords = pgTable("evidence_records", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<EvidenceRecord>().notNull(),
+});
+export const evidenceReviews = pgTable("evidence_reviews", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<EvidenceReview>().notNull(),
+});
+export const evidenceConnectors = pgTable("evidence_connectors", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<ConnectorState>().notNull(),
+});
+export const evidenceReports = pgTable("evidence_reports", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<EvidenceWeeklyReport>().notNull(),
+});
 
 export const stories = pgTable("stories", {
   id: text("id").primaryKey(),
@@ -119,6 +142,15 @@ export const backupRuns = pgTable("backup_runs", {
 
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
+  ...[
+    "evidence_records",
+    "evidence_reviews",
+    "evidence_connectors",
+    "evidence_reports",
+  ].map(
+    (name) =>
+      `CREATE TABLE IF NOT EXISTS ${name} (id text PRIMARY KEY, data jsonb NOT NULL)`,
+  ),
   `CREATE TABLE IF NOT EXISTS stories (id text PRIMARY KEY, url text NOT NULL UNIQUE, data jsonb NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS opportunities (id text PRIMARY KEY, data jsonb NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS quotes (symbol text PRIMARY KEY, data jsonb NOT NULL)`,

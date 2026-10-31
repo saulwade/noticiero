@@ -1,14 +1,20 @@
 import { getDb } from "@/db/client";
-import { jobs, backupRuns, operationAlerts } from "@/db/schema";
+import {
+  jobs,
+  backupRuns,
+  operationAlerts,
+  evidenceConnectors,
+} from "@/db/schema";
 import { healthFindings } from "./health";
 import type { BackupRun, OperationAlert, OperationsData } from "@/lib/types";
 import { z } from "zod";
 export async function getOperationsData(): Promise<OperationsData> {
   const db = await getDb();
-  const [runs, backups, alerts] = await Promise.all([
+  const [runs, backups, alerts, connectors] = await Promise.all([
     db.select().from(jobs),
     db.select().from(backupRuns),
     db.select().from(operationAlerts),
+    db.select().from(evidenceConnectors),
   ]);
   const backup = backups
     .map((row) => row.data)
@@ -22,6 +28,13 @@ export async function getOperationsData(): Promise<OperationsData> {
     backup,
   );
   const now = new Date().toISOString();
+  for (const row of connectors) {
+    if (row.data.status === "error" || row.data.blocked)
+      current.push({
+        id: `evidence-${row.id}`,
+        message: `Radar: ${row.id} — ${row.data.message}`,
+      });
+  }
   return {
     backup,
     lastSuccessfulUpdate,

@@ -10,6 +10,7 @@ import { isRelevantStory } from "@/features/news/relevance";
 import type { DashboardData, Story, JobRun, SavedItem } from "@/lib/types";
 import { getValidationData } from "@/features/validation/service";
 import { getOperationsData } from "@/features/operations/service";
+import { getEvidenceData } from "@/features/evidence/service";
 
 export async function getStories(): Promise<Story[]> {
   const db = await getDb();
@@ -131,6 +132,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     research,
     validation,
     operations,
+    evidence,
   ] = await Promise.all([
     getStories(),
     db.select().from(tables.quotes),
@@ -144,6 +146,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     getResearchData(),
     getValidationData(),
     getOperationsData(),
+    getEvidenceData(),
   ]);
   // Upgrade old bookmarks from raw rows before editorial/evidence filters run.
   // Patch only the missing snapshot so concurrent annotation edits survive.
@@ -265,6 +268,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       model: cfg.configured ? cfg.model : undefined,
     },
     research,
+    evidence,
     validation,
     operations,
     demo: false,

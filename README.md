@@ -60,7 +60,21 @@ En **Oportunidades → Archivo automático** puedes revisar hoy, los últimos 3,
 
 Para trabajar cada tres días: abre el archivo, descarga el periodo y pide revisar problemas repetidos, evidencia que contradice cada hipótesis y preguntas para entrevistas. En el chat local de este proyecto, Codex puede consultar los datos cuando lo solicites; guardar en la app no envía un mensaje al chat.
 
-## Respaldos automáticos y avisos
+## Radar de problemas (primera etapa)
+
+**Radar de problemas** reúne fichas con citas, contexto, alternativas mencionadas, contradicciones y preguntas para entrevistar. Mantiene separados los autores públicos y las reclamaciones anónimas. El país desconocido no se deduce del idioma; CFPB y PROFECO indican jurisdicción de la fuente, no residencia verificada.
+
+Durante cada actualización, el Radar incorpora preguntas/comentarios de HN ya guardados y consulta una muestra pública de **CFPB** y **GitHub Issues**. Cada conector nuevo hace como máximo una solicitud de 1 MiB y 20 resultados, con pausa mínima de seis horas entre intentos; los cron existentes siguen mañana y noche. GitHub se limita a n8n, Supabase, Immich y Actual Budget, excluye PR y bots y no usa tokens ni repositorios privados. Se respetan pausas de la API. Los recuentos son una muestra; no representan todo internet ni todos los clientes. CFPB aporta categorías administrativas y únicamente conserva narrativa cuando la fuente la incluye.
+
+**Importar CSV PROFECO** permite seleccionar localmente un archivo y enviarlo solo al pulsar importar. Límite: 1 MB / 500 filas, con expediente, fecha de ingreso, proveedor y motivo o giro. Admite encabezados en español, comas/punto y coma y fechas AAAA-MM-DD o DD/MM/AAAA. Descarta columnas personales; no autentica la procedencia del archivo. El portal oficial bloqueó el acceso directo durante la investigación, por lo que esta integración es una importación explícita, no una descarga automática. Se conserva la fecha original para que datos antiguos no parezcan un crecimiento reciente.
+
+Las evaluaciones **Útil / Mal clasificado / Duplicado / Segmento incorrecto** y sus notas se guardan al confirmar. La última versión de cada caso determina su ficha actual; las anteriores permanecen archivadas. Una resolución se muestra como contradicción y no aumenta la demanda. **Preparar entrevistas** crea/reabre un proyecto sin sobrescribir notas ni entrevistas anteriores.
+
+El balance semanal se actualiza con las ediciones y permanece provisional hasta el cierre del domingo desde las 20:00 CDMX. Los cierres son inmutables y se recupera el cierre del periodo anterior si se cambia de semana. Compara publicaciones por su fecha original y distingue capturas históricas. La descarga del Radar contiene el archivo completo y los reportes; la vista usa una muestra acotada y un presupuesto de 1.5 MB para no superar los límites de respuestas de Vercel.
+
+El Radar tiene un límite conservador de 10,000 versiones / 16 MB de evidencia. Al alcanzarlo detiene la ampliación y genera un aviso, sin borrar datos ni subir de plan. Los cuatro nuevos grupos de datos (evidencia, evaluaciones, cursores y reportes) entran en el respaldo cifrado; la restauración también acepta respaldos anteriores de 22 tablas. No se instalaron embeddings ni se contrató una API de IA. Las correcciones manuales sirven para evaluar el motor, no lo reentrenan automáticamente. La meta de precisión en 100 ejemplos revisados requiere una evaluación posterior; no se presenta como resultado conseguido.
+
+## Operación de respaldos
 
 Las plantillas en `ops/workflows/` se instalan en el repositorio privado de operaciones configurado por `OPS_REPOSITORY`. No son workflows activos en el repositorio público de la app. El respaldo corre diariamente a las 10:23 UTC (04:23 CDMX, sujeto a la cola de GitHub). El monitor independiente corre a las 15:37 y 04:37 UTC, después de las ventanas editoriales de la mañana y noche.
 

@@ -25,6 +25,7 @@ import { aiConfig, analysisMode } from "@/features/analysis/config";
 import { loadCommunity } from "@/features/sources/community";
 import { loadRequestsForStartups } from "@/features/sources/yc";
 import { runLocalResearch } from "@/features/research/service";
+import { refreshEvidence } from "@/features/evidence/service";
 import { generateOpportunities } from "@/features/opportunities/generate";
 import { updateQuote } from "@/features/market/alpha-vantage";
 import { getCompany } from "@/features/market/company-catalog";
@@ -213,6 +214,9 @@ export async function analyzeIdeas(id: string): Promise<void> {
   const job = await activeJob(id);
   if (analysisMode() === "local") {
     await runLocalResearch(new Date(job.startedAt), () => activeJob(id));
+    await refreshEvidence(await getStories(), new Date(job.startedAt), () =>
+      activeJob(id),
+    );
     return;
   }
   if (!aiConfig().configured) return;
