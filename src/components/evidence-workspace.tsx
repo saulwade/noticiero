@@ -358,7 +358,13 @@ export function EvidenceWorkspace({
         </div>
         <div>
           <strong>
-            {data.sources.filter((source) => source.status === "ok").length}
+            {
+              data.sources.filter(
+                (source) =>
+                  !source.blocked &&
+                  (source.status === "ok" || source.status === "limited"),
+              ).length
+            }
             <small> / {data.sources.length}</small>
           </strong>
           <span>fuentes con captura correcta</span>

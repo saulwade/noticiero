@@ -147,4 +147,4 @@ No se compran APIs, licencias o planes. El costo de API generativa sigue en cero
 
 ## Revisión de alcance
 
-Se comprobó consistencia entre datos individuales y agregados, acceso documentado y acceso probado, fecha de publicación y captura, evidencia extranjera y mercado local, inferencia y hecho. No se activaron nuevas fuentes, cuentas, modelos ni gastos. La propuesta está lista para revisión; la app actual continúa funcionando.
+En la investigación inicial se comprobó consistencia entre datos individuales y agregados, acceso documentado y acceso probado, fecha de publicación y captura, evidencia extranjera y mercado local, inferencia y hecho. Tras la aprobación del usuario se implementó y publicó la primera etapa; los resultados de producción y recuperación de respaldo están en el plan de implementación. Las ampliaciones posteriores de esta propuesta permanecen pendientes.
