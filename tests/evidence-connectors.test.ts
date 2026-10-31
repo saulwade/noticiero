@@ -124,6 +124,7 @@ describe("conectores públicos acotados", () => {
       json({ ...cfpb([complaint], 2000), _meta: { is_data_stale: true } }),
     );
     expect(result.state.status).toBe("limited");
+    expect(result.state.blocked).not.toBe(true);
     expect(result.state.message).toContain("desactualizados");
   });
   it("conserva el día administrativo CFPB aunque la API lo codifique con zona y hora", async () => {
@@ -263,6 +264,8 @@ describe("conectores públicos acotados", () => {
       fetcher,
     );
     expect(limited.state.status).toBe("limited");
+    expect(limited.state.blocked).toBe(true);
+    expect(paused.state.blocked).toBe(true);
     expect(paused.state.message).toContain("2026-10-31T20:02:00.000Z");
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(paused.records).toEqual([]);

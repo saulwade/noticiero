@@ -116,6 +116,7 @@ function cooldown(
       state: {
         id: source,
         status: "limited",
+        blocked: true,
         checkedAt: now.toISOString(),
         count: 0,
         message: `Pausa solicitada por la API hasta ${retryAt}.`,
@@ -135,6 +136,7 @@ function failure(
     state: {
       id: source,
       status: limited ? "limited" : "error",
+      blocked: limited,
       checkedAt: now.toISOString(),
       count: 0,
       message: limited
