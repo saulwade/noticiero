@@ -1,3 +1,4 @@
+import { withAlphaRequest } from "@/features/market/request-budget";
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { getDb, resultRows } from "@/db/client";
@@ -196,6 +197,7 @@ async function cachedPrice(
 export async function syncDailyFinance(
   now = new Date(),
   providers: Providers = defaults,
+  timing: Parameters<typeof withAlphaRequest>[1] = {},
 ) {
   const db = await getDb();
   const instruments = (await db.select().from(financeInstruments))
@@ -249,20 +251,21 @@ export async function syncDailyFinance(
             result.skipped++;
             continue;
           }
-          const budget = await db.execute(
-            sql`INSERT INTO usage(key,amount) VALUES (${`quote:${now.toISOString().slice(0, 10)}`},1) ON CONFLICT(key) DO UPDATE SET amount=usage.amount+1 WHERE usage.amount<20 RETURNING key`,
+          const request = await withAlphaRequest(
+            () => providers.price(target.instrument!, now),
+            timing,
           );
-          if (!resultRows(budget).length) {
+          if (!request.ok) {
             await finish(
               state,
               "error",
-              "Se alcanzó la cuota compartida de cotizaciones; se conserva el último dato y se reintentará en otro ciclo.",
+              "La cuota o el turno compartido de cotizaciones están ocupados; se conserva el último dato y se reintentará en otro ciclo.",
               now,
             );
             result.failed++;
             continue;
           }
-          reference = await providers.price(target.instrument, now);
+          reference = request.value;
         }
       } else reference = await providers.fx(now);
       await finish(

@@ -37,7 +37,7 @@
 
 ## Verificación local y revisión
 
-230 pruebas de lógica/integración, 8 de Python y 30 E2E de escritorio/teléfono pasaron; lint, TypeScript y build Webpack correctos. Revisión independiente sin bloqueos después de corregir recuperación nocturna de FX cuando la mañana devuelve un dato anterior, y normalización compartida de claves demo/blancas. Los datos completos de precio se reutilizan en el panel únicamente cuando cambio y porcentaje proceden del proveedor; no se inventan variaciones. Los registros financieros permanecen independientes.
+238 pruebas de lógica/integración, 8 de Python y 30 E2E de escritorio/teléfono pasaron; lint, TypeScript y build Webpack correctos. Revisión independiente sin bloqueos después de corregir recuperación nocturna de FX cuando la mañana devuelve un dato anterior, y normalización compartida de claves demo/blancas. Los datos completos de precio se reutilizan en el panel únicamente cuando cambio y porcentaje proceden del proveedor; no se inventan variaciones. Los registros financieros permanecen independientes.
 
 Prueba pública real Frankfurter correcta por fecha CDMX. Clave gratuita propia emitida con aprobación del usuario y prueba real de GLOBAL_QUOTE de IBM correcta para la sesión 2026-10-30, incluyendo precio, cambio y porcentaje genuinos. El smoke no creó posiciones ni movimientos. La clave se configura como secreto sensible de servidor; no se publica su valor. El cierre de producción se registra en el plan privado para evitar publicar datos de cuenta o credenciales.
 
@@ -45,3 +45,8 @@ Prueba pública real Frankfurter correcta por fecha CDMX. Clave gratuita propia 
 ## Condición de publicación
 
 Respaldo previo confirmado, publicación por Git, Ready, interfaz real y ciclo automático; luego respaldo posterior y restauración temporal comparada. El registro de esos resultados se mantiene en el plan privado. La programación automática conserva los horarios existentes; la cuenta real permanece vacía hasta que el usuario acuerde su portafolio inicial.
+
+
+## Corrección tras la prueba real de producción
+
+El primer ciclo guardó FX y una cotización, pero Alpha Vantage rechazó las otras cinco por su límite gratuito adicional de una solicitud por segundo. Se reprodujo con dos consultas públicas y se confirmó el mensaje del proveedor, sin datos privados. `src/features/market/request-budget.ts` reserva un turno exclusivo en PostgreSQL durante cada respuesta y añade 1.5 segundos de pausa al liberarlo, compartidos entre portafolio y panel de noticias, además de la cuota diaria de veinte. Las transacciones terminan antes de esperar o llamar la red. El reloj se toma después de adquirir el bloqueo; una demora de la base no puede comprimir turnos. Un token anterior no libera el turno de otro proceso. Se probaron concurrencia, límite diario, cruce UTC y espera antes de consultar instrumentos. No se amplió el plan ni se modificó la interfaz de noticias.

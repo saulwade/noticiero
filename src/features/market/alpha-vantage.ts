@@ -1,6 +1,7 @@
+import { withAlphaRequest } from "./request-budget";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
-import { getDb, resultRows } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { getDb } from "@/db/client";
 import { quotes, quoteHistory } from "@/db/schema";
 import { fetchExternal } from "@/lib/http";
 import { getCompany } from "./company-catalog";
@@ -50,19 +51,18 @@ export async function updateQuote(symbol: string): Promise<void> {
   )[0]?.data;
   if (cached && Date.now() - Date.parse(cached.fetchedAt) < 10 * 3600000)
     return;
-  const day = new Date().toISOString().slice(0, 10);
-  const reservation = await db.execute(
-    sql`INSERT INTO usage(key, amount) VALUES (${`quote:${day}`}, 1) ON CONFLICT(key) DO UPDATE SET amount = usage.amount + 1 WHERE usage.amount < 20 RETURNING key`,
-  );
-  if (!resultRows(reservation).length) return;
   const url = new URL("https://www.alphavantage.co/query");
   url.search = new URLSearchParams({
     function: "GLOBAL_QUOTE",
     symbol,
     apikey: process.env.ALPHA_VANTAGE_API_KEY,
   }).toString();
-  const response = await fetchExternal(url.href, ["www.alphavantage.co"], 1);
-  const data = parseQuote(await response.json(), symbol);
+  const result = await withAlphaRequest(async () => {
+    const response = await fetchExternal(url.href, ["www.alphavantage.co"], 1);
+    return parseQuote(await response.json(), symbol);
+  });
+  if (!result.ok) return;
+  const data = result.value;
   await db
     .insert(quotes)
     .values({ symbol, data })

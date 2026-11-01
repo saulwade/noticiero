@@ -1,12 +1,16 @@
+import { eq } from "drizzle-orm";
+import { alphaSlotName } from "@/features/market/request-budget";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { getFinanceData } from "@/features/finance/service";
 import { getDb } from "@/db/client";
 import * as t from "@/db/schema";
 import {
-  syncDailyFinance,
+  syncDailyFinance as runDailySync,
   financeSyncFindings,
 } from "@/features/finance/daily-sync";
 import type { Instrument, FinanceSyncState } from "@/features/finance/types";
+const syncDailyFinance: typeof runDailySync = (at, providers) =>
+  runDailySync(at, providers, { clock: () => at!, wait: async () => {} });
 const now = new Date("2026-10-31T02:30:00Z");
 const at = now.toISOString();
 const stock: Instrument = {
@@ -36,6 +40,7 @@ const price = () =>
 beforeEach(async () => {
   vi.stubEnv("ALPHA_VANTAGE_API_KEY", "test-secret-not-real");
   const db = await getDb();
+  await db.delete(t.leases).where(eq(t.leases.name, alphaSlotName));
   for (const table of [
     t.financeSync,
     t.financeMarks,
@@ -111,6 +116,18 @@ describe("sincronización diaria privada y acotada", () => {
         (r) => !("quote" in r.data),
       ),
     ).toBe(true);
+  });
+  it("espera el slot compartido antes de consultar dos instrumentos", async () => {
+    await register();
+    await register({ ...stock, id: "second", symbol: "MSFT" });
+    const providers = { fx: fx(), price: price() };
+    let clock = now.getTime();
+    const wait = vi.fn().mockImplementation(async (ms: number) => {
+      clock += ms;
+    });
+    await runDailySync(now, providers, { clock: () => new Date(clock), wait });
+    expect(wait.mock.calls.map((c) => c[0])).toEqual([1500]);
+    expect(providers.price).toHaveBeenCalledTimes(2);
   });
   it("separa fallo de precio y éxito FX; conserva referencia previa sin mensajes externos", async () => {
     await register();
