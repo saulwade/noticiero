@@ -20,7 +20,7 @@ import type {
 } from "./research-types";
 import { findResearchIssuers, researchIssuers } from "./stock-catalog";
 
-export const FINANCE_NEWS_ENGINE_VERSION = "finance-news-v3";
+export const FINANCE_NEWS_ENGINE_VERSION = "finance-news-v4";
 const normalize = (text: string) =>
   text
     .toLowerCase()
@@ -134,7 +134,7 @@ const kinds: {
     kind: "macro",
     topic: "Tasas y economía",
     pattern:
-      /\b(interest rates?|federal reserve|central banks?|inflation|monetary policy|unemployment|gdp|bond yields?|tasas? de interes|bancos? centrales?|inflacion|politica monetaria|desempleo|pib|rendimientos? de bonos)\b/,
+      /\b(interest rates?|rate cuts?|rate hikes?|(?:raises?|cuts?|holds?|hikes?|lowers?) (?:interest )?rates?|federal funds|fomc|inflation|monetary policy|unemployment|gdp|bond yields?|treasury yields?|exchange rates?|usd\/mxn|tipo de cambio|tasas? de interes|inflacion|politica monetaria|desempleo|pib|rendimientos? de bonos)\b/,
     hypothesis:
       "Un cambio macroeconómico podría alterar financiación, demanda o divisas de forma distinta por empresa; hace falta medir exposición y evitar extrapolar una noticia a todos los activos.",
     questions: [

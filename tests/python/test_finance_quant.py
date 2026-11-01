@@ -91,6 +91,24 @@ class QuantTest(unittest.TestCase):
             self.assertEqual(result["action"], "maintain" if monthly == "0" else "contribute")
             self.assertTrue(all(s["endValueMxn"] == "0.00" for s in result["actualRisk"]["scenarios"]))
 
+    def test_administrative_fed_notice_is_not_a_rate_change_from_generated_topic(self):
+        value = fixture()
+        value["news"] = [{"id": "bank-approval", "title": "Federal Reserve Board approves application by a bank", "summary": "Administrative application approved.",
+            "excerpt": "Administrative application approved.", "topic": "Tasas y economía", "eventKind": "macro", "companies": [],
+            "url": "https://example.com/bank-approval", "sourceName": "Fuente sintética", "publishedAt": "2026-10-31T12:00:00Z"}]
+        self.assertEqual(self.report(value)["news"], [])
+        value["news"][0].update(title="Inflation rises above expectations", summary="Inflation increased.", excerpt="Inflation increased.")
+        news = self.report(value)["news"]
+        self.assertIn("inflación", news[0]["mechanism"])
+        value["news"][0].update(title="GDP grows to USD 2 trillion", summary="Economic activity expanded.", excerpt="Economic activity expanded.")
+        self.assertIn("actividad económica", self.report(value)["news"][0]["mechanism"])
+
+    def test_macro_rate_is_not_automatically_an_interest_rate(self):
+        for source, expected in [("exchange rate usd/mxn falls", "fx"), ("unemployment rate rises", "activity"),
+                ("inflation rate rises above expectations", "inflation"), ("treasury yields fall after auction", "rates"),
+                ("bond yields rise", "rates"), ("fed rates", "rates"), ("fed cuts interest rates as inflation falls", "rates")]:
+            self.assertEqual(self.engine.source_macro_driver(source), expected)
+
     def test_no_history_keeps_visible_provisional_budget_and_no_fake_metrics(self):
         value = fixture(); value["histories"] = []
         result = self.report(value)
@@ -461,7 +479,7 @@ class QuantTest(unittest.TestCase):
     def test_news_is_bounded_dated_conditional_and_does_not_change_weights(self):
         value = fixture()
         for i in range(12):
-            value["news"].append({"id": str(i), "title": ["Fed rates", "Peso y dólar FX", "Inflation report"][i % 3] + str(i),
+            value["news"].append({"id": str(i), "title": ["Fed rates", "Peso y dólar FX", "Inflation report"][i % 3] + " " + str(i),
                 "url": "https://example.test/" + str(i), "sourceName": "Synthetic",
                 "publishedAt": "2026-10-31T12:00:00Z", "eventKind": "macro"})
         result = self.report(value)

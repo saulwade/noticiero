@@ -36,6 +36,12 @@ function event(
   return buildFinanceNewsEvent(story, now)!;
 }
 describe("investigación de emisores relacionados", () => {
+  it("un trámite de la Fed no se convierte en política monetaria por el nombre del emisor", () => {
+    const notice = event(
+      "Federal Reserve Board approves application by a bank",
+    );
+    expect(notice.eventKind).not.toBe("macro");
+  });
   it("una GPU de videojuegos no activa proveedores de centros de datos", () => {
     const result = discoverStockCandidates(
       [event("NVIDIA launches a gaming GPU for desktop PCs")],

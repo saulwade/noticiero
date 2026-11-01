@@ -73,10 +73,13 @@ export function selectAutomationNews(
       const published = Date.parse(event.publishedAt),
         captured = Date.parse(event.capturedAt);
       const macro =
-        event.eventKind === "macro" ||
-        /\b(?:federal reserve|fed|banxico|central bank|interest rates?|inflation|inflaci[oó]n|monetary policy|pol[ií]tica monetaria|tasas? de inter[eé]s|treasury yields?|bond yields?|tipo de cambio)\b/iu.test(
-          `${event.title} ${event.topic}`,
-        );
+        /\b(?:fomc|federal funds|interest rates?|rate cuts?|rate hikes?|(?:raises?|cuts?|holds?|hikes?|lowers?) (?:interest )?rates?|inflation|inflaci[oó]n|monetary policy|pol[ií]tica monetaria|tasas? de inter[eé]s|treasury yields?|bond yields?|exchange rates?|usd\/mxn|tipo de cambio|unemployment|desempleo|gdp|pib|recession|recesi[oó]n)\b/iu.test(
+          `${event.title} ${event.excerpt}`,
+        ) ||
+        (/\b(?:fed|federal reserve|banxico|central bank)\b/iu.test(
+          `${event.title} ${event.excerpt}`,
+        ) &&
+          /\b(?:rates?|tasas?)\b/iu.test(`${event.title} ${event.excerpt}`));
       const listed = event.companies.some((company) => !company.private);
       const financialSystem =
         event.eventKind === "security" &&

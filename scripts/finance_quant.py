@@ -510,6 +510,24 @@ def bootstrap(returns, weights, capital, monthly, horizon, seed):
     return projections
 
 
+def source_macro_driver(context):
+    tokens = set("".join(character if character.isalnum() else " " for character in context).split())
+    if tokens & {"fomc"} or any(phrase in context for phrase in (
+            "interest rate", "policy rate", "monetary policy", "política monetaria", "politica monetaria", "federal funds",
+            "treasury yield", "bond yield", "yield curve", "tasa de interes", "tasas de interes", "tasa de interés", "tasas de interés",
+            "rendimiento de bonos", "rendimientos de bonos", "rendimientos del tesoro")):
+        return "rates"
+    if tokens & {"inflation", "inflación", "inflacion", "cpi", "ipc"}:
+        return "inflation"
+    if tokens & {"gdp", "pib", "recession", "recesión", "recesion", "employment", "unemployment", "empleo", "desempleo", "economy", "economía", "economia"}:
+        return "activity"
+    if tokens & {"fx", "mxn", "peso", "pesos", "dollar", "dólar", "divisas", "currency"} or "usd/mxn" in context or "exchange rate" in context or "tipo de cambio" in context:
+        return "fx"
+    if tokens & {"rate", "rates", "tasa", "tasas"} and (tokens & {"fed", "banxico"} or "federal reserve" in context or "central bank" in context):
+        return "rates"
+    return ""
+
+
 def curated_news(data, as_of):
     candidates = []
     financial_system_terms = {"bank", "banks", "banking", "banco", "bancos", "bancario", "payments", "payment", "pagos", "financiero", "financieras", "financiera", "financial", "bolsa", "treasury"}
@@ -524,22 +542,17 @@ def curated_news(data, as_of):
         if (as_of - published).days > 30:
             continue
         kind = event.get("eventKind", "business")
-        context = " ".join(text(event.get(key), 1200) for key in ["title", "summary", "excerpt", "topic"]).lower()
+        # Generated category/topic labels are not evidence of what the source said.
+        context = " ".join(text(event.get(key), 1200) for key in ["title", "summary", "excerpt"]).lower()
         tokens = set("".join(character if character.isalnum() else " " for character in context).split())
         companies = [company for company in event.get("companies", [])[:30] if isinstance(company, dict)]
         public = sorted({text(company.get("name"), 60) for company in companies if company.get("private") is False and company.get("name")})[:3]
         private = sorted({text(company.get("name"), 60) for company in companies if company.get("private") is True and company.get("name")})[:3]
         system_link = bool(tokens & financial_system_terms) or "financial loss" in context or "pérdidas financieras" in context
-        driver = ""
-        if tokens & {"fx", "usd", "mxn", "peso", "pesos", "dollar", "dólar", "divisas", "currency"}:
-            driver = "fx"
-        elif tokens & {"fed", "rates", "rate", "tasas", "tasa", "banxico", "interest"} or "federal reserve" in context:
-            driver = "rates"
-        elif tokens & {"inflation", "inflación", "cpi", "ipc"}:
-            driver = "inflation"
-        elif tokens & {"gdp", "pib", "recession", "recesión", "employment", "empleo", "economy", "economía"}:
-            driver = "activity"
+        driver = source_macro_driver(title.lower()) or source_macro_driver(context)
         if kind == "security" and not (public or system_link):
+            continue
+        if kind == "macro" and not driver:
             continue
         if kind == "macro":
             rank = 100 if driver else 85

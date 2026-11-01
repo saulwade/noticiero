@@ -187,6 +187,21 @@ function newsFixture(
 }
 
 describe("preparación y archivo automático sin registrar inversiones", () => {
+  it("una etiqueta macro antigua no convierte un trámite bancario en un cambio de tasas", () => {
+    expect(
+      selectAutomationNews(
+        [
+          newsFixture("administrative-fed", {
+            title: "Federal Reserve Board approves application by a bank",
+            excerpt: "Administrative approval of an application.",
+            topic: "Tasas y economía",
+            eventKind: "macro",
+          }),
+        ],
+        now,
+      ),
+    ).toEqual([]);
+  });
   it("investiga relaciones de compañías privadas aunque no entren al contexto bursátil base", async () => {
     await seed();
     const db = await getDb(),
