@@ -1654,3 +1654,21 @@
 .opportunity-secondary .evidence-workspace h1 {
   font-size: clamp(28px, 3vw, 38px);
 }
+.fi-auto-news-disclosure > summary {
+  padding-block: 6px 14px;
+}
+.fi-auto-news-disclosure > summary h2 {
+  font-size: 21px;
+  margin: 5px 0 8px;
+}
+.fi-auto-news-disclosure > summary p {
+  color: var(--fi-muted);
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 0;
+}
+.fi-auto-news-content > p {
+  color: var(--fi-muted);
+  font-size: 11px;
+  line-height: 1.8;
+}

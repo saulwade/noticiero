@@ -39,6 +39,7 @@ import type {
   AutomationWorkspace,
 } from "./automatic-types";
 import type { FinanceMark, FinanceSyncState } from "./types";
+import type { FinanceNewsEvent } from "./research-types";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 type Reader = Pick<Db, "select">;
@@ -49,6 +50,69 @@ const failureMessage =
   "El análisis automático quedó pendiente. Se conserva el informe anterior; revisa conexión, datos, cuota y capacidad del archivo.";
 const configuredMessage =
   "Falta configurar un perfil privado válido con capital, aportación, horizonte, reserva y costos pendientes o verificados.";
+export function selectAutomationNews(
+  events: FinanceNewsEvent[],
+  now = new Date(),
+): FinanceNewsEvent[] {
+  const cutoff = now.getTime() - 30 * DAY;
+  const financialPriority: Partial<
+    Record<FinanceNewsEvent["eventKind"], number>
+  > = {
+    earnings: 400,
+    regulation: 250,
+    acquisition: 150,
+    business: 100,
+    funding: 75,
+    security: 25,
+    infrastructure: 20,
+    products: 20,
+  };
+  return events
+    .map((event) => {
+      const published = Date.parse(event.publishedAt),
+        captured = Date.parse(event.capturedAt);
+      const macro =
+        event.eventKind === "macro" ||
+        /\b(?:federal reserve|fed|banxico|central bank|interest rates?|inflation|inflaci[oó]n|monetary policy|pol[ií]tica monetaria|tasas? de inter[eé]s|treasury yields?|bond yields?|tipo de cambio)\b/iu.test(
+          `${event.title} ${event.topic}`,
+        );
+      const listed = event.companies.some((company) => !company.private);
+      const financialSystem =
+        event.eventKind === "security" &&
+        /\b(?:banks?|banking|payment outages?|payment networks?|payment systems?|financial system|bancos?|bancari[oa]s?|sistema financiero|red de pagos)\b/iu.test(
+          `${event.title} ${event.excerpt}`,
+        );
+      const material =
+        macro || listed || event.eventKind === "earnings" || financialSystem;
+      return {
+        event,
+        published,
+        captured,
+        score:
+          (macro ? 1000 : 0) +
+          (listed ? 200 : 0) +
+          (financialPriority[event.eventKind] ?? 0),
+        material,
+      };
+    })
+    .filter(
+      (row) =>
+        row.material &&
+        Number.isFinite(row.published) &&
+        Number.isFinite(row.captured) &&
+        row.published >= cutoff &&
+        row.published <= now.getTime() &&
+        row.captured <= now.getTime(),
+    )
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        b.published - a.published ||
+        a.event.id.localeCompare(b.event.id),
+    )
+    .slice(0, 32)
+    .map((row) => row.event);
+}
 export type AutomationProviders = {
   history: typeof fetchWeeklyHistory;
   reference: typeof fetchAutomationReference;
@@ -431,9 +495,13 @@ export async function prepareAutomationInput(
         warnings.push(
           "Tolerancia al riesgo sin confirmar: la distribución es provisional y requiere revisar pérdidas ilustrativas.",
         );
-      const news = (await getFinanceNewsWorkspace(false, now, tx)).events
-        .filter((e) => Date.parse(e.capturedAt) <= now.getTime())
-        .slice(0, 12);
+      const archivedNews = (await getFinanceNewsWorkspace(true, now, tx))
+        .events;
+      const news = selectAutomationNews(archivedNews, now);
+      if (archivedNews.length)
+        warnings.push(
+          "Noticias del cálculo: muestra priorizada de hasta 32 eventos materiales de los últimos 30 días. El briefing y archivo conservan las noticias completas.",
+        );
       const input: AutomationInput = {
         version: 1,
         engineVersion: modelConfig.version,

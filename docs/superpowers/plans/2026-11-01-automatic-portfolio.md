@@ -50,3 +50,8 @@ El usuario consulta briefing a diario y decisiones cuando lo desee. El cálculo 
 
 
 La versión de motor se comparte entre Python y servidor en `automatic-engine-version.json` y forma parte de la huella de entrada. Un cambio de modelo conserva los informes anteriores y marca lo previo como pendiente de actualización. Las cuentas con movimientos y saldo real cero conservan ese cero en escenarios/proyecciones; no se restaura un capital hipotético.
+
+
+## Ajuste verificado durante la prueba publicada
+
+El contexto financiero queda desplegable y limitado a tres noticias materiales; la entrada usa hasta 32 candidatos de treinta días con prioridad financiera y límite de bytes. Se excluye ruido de seguridad sin conexión financiera, conservando incidentes de bancos/pagos aunque no haya una empresa del catálogo. Las fuentes y fechas se preservan exactamente. La semilla de simulación depende solo de datos económicos y método, para evitar variación artificial por noticias o timestamps. Motor 1.1.3; 326 pruebas de aplicación y 42 Python correctas, además de lint/tipos/revisión independiente. La prueba de navegador se ejecuta sobre la compilación final de este ajuste. La publicación previa y el trabajador privado ya pasaron; el cierre final continúa registrado en la propuesta privada.

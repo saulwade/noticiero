@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { load } from "cheerio";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
@@ -66,6 +67,31 @@ describe("automatic portfolio presentation", () => {
       "no reutiliza automáticamente el efectivo registrado",
     );
     expect(html).not.toContain("<form");
+  });
+  it("keeps news sources and mechanisms in a disclosure closed by default", () => {
+    const data = fixture();
+    const html = renderToStaticMarkup(
+      createElement(FinanceAutomaticAnalysis, { automation: data.automation }),
+    );
+    const $ = load(html);
+    const newsContext = $('[aria-label="Impacto de noticias en la cartera"]');
+    const disclosure = newsContext.children("details");
+    expect(disclosure).toHaveLength(1);
+    expect(disclosure.attr("open")).toBeUndefined();
+    expect(disclosure.children("summary").text()).toContain(
+      "Contexto para la decisión.",
+    );
+    expect(disclosure.children("summary").text()).toContain(
+      "1 noticia relevante",
+    );
+    expect(disclosure.find("article").text()).toContain(
+      data.automation!.current!.news[0].mechanism,
+    );
+    expect(disclosure.find("a").attr("href")).toBe(
+      data.automation!.current!.news[0].url,
+    );
+    expect(newsContext.find("form")).toHaveLength(0);
+    expect($(".fi-auto-contribution").parents("details")).toHaveLength(0);
   });
   it("marks an outdated report as an earlier reference", () => {
     const automation = fixture().automation!;

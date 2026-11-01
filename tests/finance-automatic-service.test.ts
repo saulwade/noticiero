@@ -8,6 +8,7 @@ import {
   prepareAutomationInput,
   publishAutomationReport,
   recordAutomationFailure,
+  selectAutomationNews,
   type AutomationProviders,
 } from "@/features/finance/automatic-service";
 import {
@@ -19,6 +20,7 @@ import type {
   AutomationProfile,
   AutomationReport,
 } from "@/features/finance/automatic-types";
+import type { FinanceNewsEvent } from "@/features/finance/research-types";
 const now = new Date("2026-11-01T12:00:00Z");
 // Entirely synthetic profile; these values do not represent an account.
 const profile: AutomationProfile = {
@@ -145,6 +147,43 @@ beforeEach(async () => {
 async function seed() {
   const db = await getDb();
   await db.insert(t.financeProfiles).values({ id: profile.id, data: profile });
+}
+function newsFixture(
+  id: string,
+  changes: Partial<FinanceNewsEvent> = {},
+): FinanceNewsEvent {
+  return {
+    id,
+    storyId: id,
+    contentHash: id,
+    engineVersion: "synthetic-news",
+    title: "Billboard software security bug",
+    url: `https://example.com/${id}`,
+    sourceId: "synthetic",
+    sourceName: "Fuente sintética",
+    publishedAt: "2026-11-01T11:00:00Z",
+    capturedAt: "2026-11-01T11:30:00Z",
+    category: "Finanzas",
+    coverage: "excerpt",
+    excerpt: "Documento sintético para probar selección de contexto.",
+    summary: "Contexto sintético.",
+    summaryLanguage: "es",
+    companies: [],
+    eventKind: "security",
+    topic: "security",
+    keywords: [],
+    mechanismHypothesis: "Comprobar exposición financiera.",
+    questions: [],
+    missingEvidence: [],
+    tone: {
+      label: "unclassified",
+      positiveTerms: [],
+      negativeTerms: [],
+      method: "Sintético",
+      caveat: "Sin inferencia predictiva.",
+    },
+    ...changes,
+  };
 }
 
 describe("preparación y archivo automático sin registrar inversiones", () => {
@@ -597,5 +636,101 @@ describe("preparación y archivo automático sin registrar inversiones", () => {
     } finally {
       modelConfig.version = configuredVersion;
     }
+  });
+  it("conserva incidentes del sistema financiero sin exigir una empresa del catálogo", () => {
+    const bank = newsFixture("bank-outage", {
+      title: "Regional bank payment outage",
+      eventKind: "security",
+      companies: [],
+    });
+    const billboard = newsFixture("billboard-noise", {
+      title: "Hackers hijack highway billboard",
+      eventKind: "security",
+      companies: [],
+    });
+    expect(
+      selectAutomationNews([billboard, bank], now).map((event) => event.id),
+    ).toEqual(["bank-outage"]);
+  });
+  it("prioriza macro antigua material sobre ruido reciente y excluye capturas futuras", async () => {
+    await seed();
+    const db = await getDb();
+    const events = [
+      ...Array.from({ length: 80 }, (_, i) => newsFixture(`security-${i}`)),
+      newsFixture("older-fed", {
+        title: "Federal Reserve changes interest rates",
+        eventKind: "macro",
+        topic: "Tipos de interés",
+        publishedAt: "2026-10-10T10:00:00Z",
+      }),
+      newsFixture("listed-earnings", {
+        title: "Microsoft reports earnings",
+        eventKind: "earnings",
+        publishedAt: "2026-10-20T10:00:00Z",
+        companies: [{ symbol: "MSFT", name: "Microsoft", private: false }],
+      }),
+      newsFixture("future-capture", {
+        title: "Federal Reserve changes rates",
+        eventKind: "macro",
+        capturedAt: "2026-11-02T00:00:00Z",
+      }),
+      newsFixture("future-publication", {
+        title: "Federal Reserve changes rates",
+        eventKind: "macro",
+        publishedAt: "2026-11-02T00:00:00Z",
+      }),
+      newsFixture("outdated-macro", {
+        title: "Federal Reserve changes rates",
+        eventKind: "macro",
+        publishedAt: "2026-09-01T00:00:00Z",
+      }),
+    ];
+    await db
+      .insert(t.financeNewsEvents)
+      .values(events.map((data) => ({ id: data.id, data })));
+    const input = await prepareAutomationInput(now, providers());
+    expect(input.news.map((e) => e.id)).toEqual([
+      "older-fed",
+      "listed-earnings",
+    ]);
+    expect(input.dataWarnings.join(" ")).toContain("muestra priorizada");
+    expect(await db.select().from(t.financeNewsEvents)).toHaveLength(
+      events.length,
+    );
+  });
+  it("limita a 32 noticias y reduce primero el contexto de menor prioridad para caber en 400 KB", async () => {
+    await seed();
+    const db = await getDb();
+    const macro = newsFixture("important-fed", {
+      title: "Federal Reserve changes interest rates",
+      eventKind: "macro",
+      topic: "Tipos de interés",
+      publishedAt: "2026-10-10T10:00:00Z",
+    });
+    const earnings = Array.from({ length: 40 }, (_, i) =>
+      newsFixture(`earnings-${i}`, {
+        title: `Microsoft earnings report ${i}`,
+        excerpt: `${i} ${"Contenido sintético. ".repeat(1200)}`,
+        eventKind: "earnings",
+        companies: [{ symbol: "MSFT", name: "Microsoft", private: false }],
+      }),
+    );
+    const events = [...earnings, macro];
+    const selected = selectAutomationNews(events, now);
+    expect(selected).toHaveLength(32);
+    expect(selected[0].id).toBe(macro.id);
+    expect(
+      selectAutomationNews([...events].reverse(), now).map((e) => e.id),
+    ).toEqual(selected.map((e) => e.id));
+    await db
+      .insert(t.financeNewsEvents)
+      .values(events.map((data) => ({ id: data.id, data })));
+    const input = await prepareAutomationInput(now, providers());
+    expect(input.news[0].id).toBe(macro.id);
+    expect(input.news.length).toBeLessThan(32);
+    expect(Buffer.byteLength(JSON.stringify(input))).toBeLessThanOrEqual(
+      400_000,
+    );
+    expect(input.dataWarnings.join(" ")).toContain("se acotó por tamaño");
   });
 });

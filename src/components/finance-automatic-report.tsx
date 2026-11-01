@@ -332,31 +332,44 @@ function ReportDetails({ report }: { report: AutomationReport }) {
         className="fi-auto-news"
         aria-label="Impacto de noticias en la cartera"
       >
-        <span className="fi-eyebrow">QUÉ CAMBIA CON LAS NOTICIAS</span>
-        <h2>Contexto para la decisión.</h2>
-        {report.news.length ? (
-          report.news.map((news) => (
-            <article key={news.id}>
-              <h3>{news.title}</h3>
-              <p>{news.mechanism}</p>
-              <p>{news.implication}</p>
-              <a href={news.url} target="_blank" rel="noopener noreferrer">
-                {news.sourceName} <ArrowUpRight size={11} />
-              </a>
-              <small> · {date(news.publishedAt)}</small>
-            </article>
-          ))
-        ) : (
-          <p>
-            No se identificó una noticia con un mecanismo relevante para este
-            informe.
-          </p>
-        )}
-        <p className="fi-footnote">
-          El impacto es una hipótesis condicional. Una noticia no prueba
-          causalidad ni predice rendimientos. El feed completo está en Mi
-          briefing.
-        </p>
+        <details className="fi-disclosure fi-auto-news-disclosure">
+          <summary>
+            <div>
+              <h2>Contexto para la decisión.</h2>
+              <p>
+                {report.news.length
+                  ? `${report.news.length} ${report.news.length === 1 ? "noticia relevante" : "noticias relevantes"} · fuentes y mecanismos`
+                  : "Sin noticias relevantes para este informe"}
+              </p>
+            </div>
+            <ChevronRight size={14} />
+          </summary>
+          <div className="fi-auto-news-content">
+            {report.news.length ? (
+              report.news.map((news) => (
+                <article key={news.id}>
+                  <h3>{news.title}</h3>
+                  <p>{news.mechanism}</p>
+                  <p>{news.implication}</p>
+                  <a href={news.url} target="_blank" rel="noopener noreferrer">
+                    {news.sourceName} <ArrowUpRight size={11} />
+                  </a>
+                  <small> · {date(news.publishedAt)}</small>
+                </article>
+              ))
+            ) : (
+              <p>
+                No se identificó una noticia con un mecanismo relevante para
+                este informe.
+              </p>
+            )}
+            <p className="fi-footnote">
+              El impacto es una hipótesis condicional. Una noticia no prueba
+              causalidad ni predice rendimientos. El feed completo está en Mi
+              briefing.
+            </p>
+          </div>
+        </details>
       </section>
       <section
         className="fi-auto-risk"

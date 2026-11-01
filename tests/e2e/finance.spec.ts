@@ -105,11 +105,30 @@ test("propuesta automática sin posiciones: importes, fracciones, motivos y esce
   await expect(portfolio.locator(".fi-auto-contribution")).toContainText(
     "$1,200.00",
   );
+  const newsContext = portfolio.getByRole("region", {
+    name: "Impacto de noticias en la cartera",
+  });
   await expect(
-    portfolio.getByRole("region", {
-      name: "Impacto de noticias en la cartera",
+    newsContext.getByText("1 noticia relevante · fuentes y mecanismos", {
+      exact: true,
     }),
-  ).toContainText(report.news[0].mechanism);
+  ).toBeVisible();
+  await expect(
+    newsContext.getByRole("heading", {
+      name: report.news[0].title,
+      exact: true,
+    }),
+  ).not.toBeVisible();
+  await newsContext
+    .getByRole("heading", { name: "Contexto para la decisión.", exact: true })
+    .click();
+  await expect(
+    newsContext.getByRole("heading", {
+      name: report.news[0].title,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(newsContext).toContainText(report.news[0].mechanism);
   await expect(
     portfolio.getByRole("link", { name: "Fuente de prueba" }),
   ).toHaveAttribute("href", report.news[0].url);

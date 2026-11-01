@@ -392,16 +392,114 @@ class QuantTest(unittest.TestCase):
             self.assertEqual(Decimal(p["medianMxn"]), expected)
         self.assertEqual(result["risk"]["historicalReturn"], 0)
 
+    def test_bootstrap_ignores_report_hash_news_and_capture_time_noise(self):
+        value = fixture(); baseline = self.report(value)
+        value.update(inputHash="new-report-hash-with-same-economic-inputs", asOf="2026-11-01T12:05:00Z")
+        for history in value["histories"]: history["capturedAt"] = "2026-11-01T12:04:00Z"
+        value["news"] = [{"id": "fresh-news", "title": "Fed rates update", "url": "https://example.test/news",
+                          "sourceName": "Synthetic", "publishedAt": "2026-11-01T12:03:00Z", "eventKind": "macro"}]
+        unchanged = self.report(value)
+        self.assertNotEqual(unchanged["id"], baseline["id"])
+        self.assertNotEqual(unchanged["news"], baseline["news"])
+        self.assertEqual(unchanged["projections"], baseline["projections"])
+
+    def test_bootstrap_seed_and_results_follow_economic_inputs(self):
+        value = fixture(); report = self.report(value)
+        as_of = self.engine.validate(value)
+        dates, returns = self.engine.histories_matrix(value, as_of, [])
+        weights = self.engine.np.array([item["weight"] for item in report["initial"]["items"]])
+        seed = self.engine.bootstrap_seed(dates, returns, weights, Decimal("12345.67"), Decimal("234.56"), 5)
+        normalized = self.engine.bootstrap_seed(dates, returns, weights, Decimal("12345.670"), Decimal("234.560"), 5)
+        self.assertEqual(seed, normalized)
+        different_capital = self.engine.bootstrap_seed(dates, returns, weights, Decimal("12345.68"), Decimal("234.56"), 5)
+        self.assertNotEqual(seed, different_capital)
+        value["profile"]["initialCapitalMxn"] = "12345.68"
+        self.assertNotEqual(report["projections"], self.report(value)["projections"])
+        value["profile"]["initialCapitalMxn"] = "12345.67"
+        point = value["histories"][0]["points"][-1]
+        point["adjustedClose"] = str(Decimal(point["adjustedClose"]) * Decimal("1.1"))
+        _, changed_returns = self.engine.histories_matrix(value, as_of, [])
+        self.assertNotEqual(seed, self.engine.bootstrap_seed(dates, changed_returns, weights, Decimal("12345.67"), Decimal("234.56"), 5))
+        self.assertNotEqual(report["projections"], self.report(value)["projections"])
+
     def test_news_is_bounded_dated_conditional_and_does_not_change_weights(self):
         value = fixture()
         for i in range(12):
-            value["news"].append({"id": str(i), "title": "Tasas y empresas", "url": "https://example.test/" + str(i),
-                "sourceName": "Synthetic", "publishedAt": "2026-10-31T12:00:00Z", "eventKind": "macro"})
+            value["news"].append({"id": str(i), "title": ["Fed rates", "Peso y dólar FX", "Inflation report"][i % 3] + str(i),
+                "url": "https://example.test/" + str(i), "sourceName": "Synthetic",
+                "publishedAt": "2026-10-31T12:00:00Z", "eventKind": "macro"})
         result = self.report(value)
-        self.assertEqual(len(result["news"]), 8)
+        self.assertEqual(len(result["news"]), 3)
         self.assertTrue(all("Si " in x["mechanism"] for x in result["news"]))
+        self.assertTrue(all("El sistema" in x["implication"] for x in result["news"]))
         self.assertEqual([x["weight"] for x in result["initial"]["items"]], [x["weight"] for x in self.report()["initial"]["items"]])
         self.assertTrue(any("USD" in x for x in result["warnings"]))
+
+    def test_news_materiality_filters_billboard_and_prioritizes_financial_context(self):
+        value = fixture()
+        def event(identity, title, kind, published="2026-10-31T12:00:00Z", companies=None):
+            return {"id": identity, "title": title, "url": "https://example.test/" + identity,
+                    "sourceName": "Synthetic", "publishedAt": published, "eventKind": kind,
+                    "companies": companies or []}
+        value["news"] = [
+            event("billboard", "Hackers hijack Egypt highway billboard and Malaysian screens to show porn", "security"),
+            event("generic", "New security attack impacts screens", "security"),
+            event("fed", "Fed signals interest rates decision", "macro", "2026-10-27T12:00:00Z"),
+            event("earnings", "Listed company reports earnings", "earnings", companies=[{"symbol": "ACME", "name": "Empresa Pública", "private": False}]),
+            event("capex", "Public infrastructure capital spending", "infrastructure", companies=[{"symbol": "ACME2", "name": "Infra Pública", "private": False}]),
+            event("private", "Private startup funding round", "funding", companies=[{"symbol": "PRIVATE", "name": "Startup", "private": True}]),
+        ]
+        result = self.report(value)
+        self.assertEqual([e["id"] for e in result["news"]], ["fed", "earnings", "capex"])
+        self.assertIn("Empresa Pública", result["news"][1]["mechanism"])
+        self.assertIn("infraestructura", result["news"][2]["mechanism"])
+        self.assertTrue(all("titular" in e["mechanism"].lower() and "cifras" in e["mechanism"].lower() for e in result["news"]))
+        self.assertTrue(all(e["url"].startswith("https://example.test/") and e["sourceName"] == "Synthetic" for e in result["news"]))
+        baseline = self.report()
+        for field in ["initial", "contribution", "risk", "scenarios", "projections", "alternatives"]:
+            self.assertEqual(result[field], baseline[field])
+
+    def test_news_keeps_exact_long_metadata_and_material_security(self):
+        value = fixture()
+        title = "Quarterly earnings report " + "x" * 325
+        source = "Public source " + "x" * 135
+        value["news"] = [{"id": "long", "title": title, "url": "https://example.test/long", "sourceName": source,
+                          "publishedAt": "2026-10-31T12:00:00Z", "eventKind": "earnings",
+                          "companies": [{"symbol": "ACME", "name": "Public Company", "private": False}]},
+                         {"id": "bank", "title": "Regional bank payment outage", "url": "https://example.test/bank",
+                          "sourceName": "Synthetic", "publishedAt": "2026-10-31T12:00:00Z", "eventKind": "security"},
+                         {"id": "private-security", "title": "Hackers target private screens", "url": "https://example.test/private-security",
+                          "sourceName": "Synthetic", "publishedAt": "2026-10-31T12:00:00Z", "eventKind": "security",
+                          "companies": [{"symbol": "PRIVATE", "name": "Private Screens", "private": True}]}]
+        result = self.report(value)
+        self.assertEqual([e["id"] for e in result["news"]], ["long", "bank"])
+        self.assertEqual(result["news"][0]["title"], title)
+        self.assertEqual(result["news"][0]["sourceName"], source)
+        value["news"][0]["capturedAt"] = "2026-11-02T00:00:00Z"
+        with self.assertRaises(ValueError): self.report(value)
+
+    def test_news_dedup_private_funding_and_distinct_conditional_mechanisms(self):
+        value = fixture()
+        def event(identity, kind, title):
+            return {"id": identity, "title": title, "url": "https://example.test/" + identity,
+                    "sourceName": "Synthetic", "publishedAt": "2026-10-31T12:00:00Z", "eventKind": kind,
+                    "companies": [{"symbol": "PRIVATE", "name": "Startup", "private": True}]}
+        value["news"] = [event("funding", "funding", "Startup funding round"),
+                         event("products", "products", "Startup product launch"),
+                         event("acquisition", "acquisition", "Startup acquisition transaction")]
+        duplicate = dict(value["news"][0]); duplicate["id"] = "duplicate"
+        value["news"].append(duplicate)
+        unsafe = dict(value["news"][0]); unsafe.update(id="unsafe", url="javascript:alert(1)")
+        value["news"].append(unsafe)
+        result = self.report(value)
+        self.assertEqual(len(result["news"]), 3)
+        self.assertEqual(len({e["url"] for e in result["news"]}), 3)
+        mechanisms = {e["mechanism"] for e in result["news"]}
+        self.assertEqual(len(mechanisms), 3)
+        funding = next(e for e in result["news"] if "financiación" in e["mechanism"])
+        self.assertIn("indirecto", funding["mechanism"])
+        self.assertIn("no se presume exposición directa a VT", funding["mechanism"])
+        self.assertTrue(all("El sistema" in e["implication"] for e in result["news"]))
 
     def test_cli_rejects_nan_and_emits_only_json_for_valid_input(self):
         result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(fixture()), text=True, capture_output=True)

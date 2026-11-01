@@ -465,6 +465,20 @@ def stress_scenarios(weights, capital):
     return result
 
 
+def bootstrap_seed(dates, returns, weights, capital, monthly, horizon):
+    economic_inputs = {
+        "method": "mbb8-weekly-1000-v1",
+        "dates": [str(day) for day in dates],
+        "returns": returns.tolist(),
+        "weights": weights.tolist(),
+        "capitalMxn": money(capital),
+        "monthlyMxn": money(monthly),
+        "horizonYears": horizon,
+    }
+    canonical = json.dumps(economic_inputs, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return int(hashlib.sha256(canonical.encode()).hexdigest()[:16], 16)
+
+
 def bootstrap(returns, weights, capital, monthly, horizon, seed):
     """Joint moving blocks, no wrap across gaps; 1000 paths; month-end flows."""
     series = returns @ weights[:2]
@@ -494,36 +508,101 @@ def bootstrap(returns, weights, capital, monthly, horizon, seed):
 
 def curated_news(data, as_of):
     candidates = []
+    financial_system_terms = {"bank", "banks", "banking", "banco", "bancos", "bancario", "payments", "payment", "pagos", "financiero", "financieras", "financiera", "financial", "bolsa", "treasury"}
     for event in data["news"]:
         published = instant(event.get("publishedAt"), "noticia.publishedAt")
-        if published > as_of:
+        if published > as_of or (event.get("capturedAt") and instant(event["capturedAt"], "noticia.capturedAt") > as_of):
             raise ValueError("noticia fechada en el futuro")
-        if not url(event.get("url")):
+        title = event.get("title")
+        source = event.get("sourceName")
+        if not url(event.get("url")) or not isinstance(title, str) or not 1 <= len(title) <= 400 or not isinstance(source, str) or not 1 <= len(source) <= 200:
             continue
         if (as_of - published).days > 30:
             continue
         kind = event.get("eventKind", "business")
-        impact = 2 if kind in ["macro", "regulation", "security"] else 1
-        candidates.append((published, impact, text(event.get("id"), 200), event))
+        context = " ".join(text(event.get(key), 1200) for key in ["title", "summary", "excerpt", "topic"]).lower()
+        tokens = set("".join(character if character.isalnum() else " " for character in context).split())
+        companies = [company for company in event.get("companies", [])[:30] if isinstance(company, dict)]
+        public = sorted({text(company.get("name"), 60) for company in companies if company.get("private") is False and company.get("name")})[:3]
+        private = sorted({text(company.get("name"), 60) for company in companies if company.get("private") is True and company.get("name")})[:3]
+        system_link = bool(tokens & financial_system_terms) or "financial loss" in context or "pérdidas financieras" in context
+        driver = ""
+        if tokens & {"fx", "usd", "mxn", "peso", "pesos", "dollar", "dólar", "divisas", "currency"}:
+            driver = "fx"
+        elif tokens & {"fed", "rates", "rate", "tasas", "tasa", "banxico", "interest"} or "federal reserve" in context:
+            driver = "rates"
+        elif tokens & {"inflation", "inflación", "cpi", "ipc"}:
+            driver = "inflation"
+        elif tokens & {"gdp", "pib", "recession", "recesión", "employment", "empleo", "economy", "economía"}:
+            driver = "activity"
+        if kind == "security" and not (public or system_link):
+            continue
+        if kind == "macro":
+            rank = 100 if driver else 85
+        elif kind == "earnings":
+            rank = 95 if public else 70
+        elif kind == "regulation":
+            rank = 90 if public or system_link else 65
+        elif kind == "infrastructure":
+            rank = 85 if public else 60
+        elif kind == "security":
+            rank = 80 if system_link else 75
+        elif kind == "acquisition":
+            rank = 80 if public else 60
+        elif kind == "funding":
+            rank = 70 if public else 60
+        elif kind == "products":
+            rank = 70 if public else 50
+        elif public or system_link or driver:
+            rank = 65
+        else:
+            continue
+        identity = text(event.get("id"), 200)
+        if not identity:
+            continue
+        # At most one item for the same conditional mechanism and named firms.
+        mechanism_key = (kind, driver if kind == "macro" else "", tuple(public or private))
+        candidates.append((rank, published, identity, event, public, private, driver, mechanism_key))
     candidates.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
     mechanisms = {
-        "macro": ("Si cambian las tasas, la inflación o la actividad, podrían cambiar las valoraciones de acciones, la renta de letras y USD/MXN.", "Revisar exposición a acciones y dólar; el titular por sí solo no justifica cambiar pesos."),
-        "regulation": ("Si la medida descrita entra en vigor y afecta flujos o costes, podría alterar beneficios de empresas incluidas en índices globales.", "Confirmar alcance y calendario; mantener la diversificación mientras no cambie el objetivo personal."),
-        "security": ("Si el incidente provoca pérdidas o interrupciones duraderas, podría afectar resultados de las empresas implicadas.", "Vigilar evidencia sobre daños y alcance; no convertir tono periodístico en rentabilidad esperada."),
+        "macro": ("Si cambian las condiciones macroeconómicas descritas, podrían cambiar valoraciones, ingresos y USD/MXN.", "El sistema vigila las condiciones macroeconómicas; no hay evidencia suficiente en este contexto para cambiar los pesos."),
+        "rates": ("Si las tasas descritas cambian de forma persistente, podrían afectar la renta de letras USD, el coste de financiación y las valoraciones de acciones.", "El sistema vigila tasas y su relación con deuda USD y acciones; el titular no activa un cambio de pesos."),
+        "fx": ("Si persiste la variación del dólar frente al peso descrita, podría cambiar el valor en MXN de los activos cotizados en USD, incluido SGOV.", "El sistema revisa la exposición de cotización USD y sus choques; no extrapola el cambio observado ni cambia pesos por este titular."),
+        "inflation": ("Si la inflación descrita modifica tasas o costes de forma persistente, podría afectar poder adquisitivo, márgenes y valoraciones.", "El sistema vigila inflación y tasas; las proyecciones nominales no garantizan preservar poder adquisitivo."),
+        "activity": ("Si la actividad económica descrita cambia de forma persistente, podría afectar demanda, beneficios y condiciones de financiación.", "El sistema vigila actividad y resultados; este contexto no basta para cambiar la distribución."),
+        "earnings": ("Si los resultados descritos reflejan un cambio duradero de ingresos o márgenes, podrían modificar los flujos de caja y la valoración de las empresas mencionadas.", "El sistema vigila resultados y persistencia de márgenes; una publicación aislada no aporta evidencia suficiente para cambiar pesos."),
+        "regulation": ("Si la medida descrita entra en vigor y modifica costes o acceso a mercados, podría afectar flujos de caja de las empresas o del sistema financiero implicados.", "El sistema vigila alcance y entrada en vigor; este contexto no confirma un impacto cuantificable ni activa operaciones."),
+        "security": ("Si el incidente descrito causa pérdidas financieras o interrupciones duraderas, podría afectar costes, continuidad o confianza en las empresas y servicios financieros implicados.", "El sistema vigila continuidad y pérdidas documentadas; no convierte un incidente ni su tono periodístico en rentabilidad esperada."),
+        "infrastructure": ("Si el gasto de infraestructura descrito se ejecuta y produce ingresos suficientes para sus costes, podría cambiar capacidad, demanda a proveedores y flujos de caja.", "El sistema vigila ejecución del gasto y resultados posteriores; el anuncio por sí solo no demuestra rentabilidad ni justifica cambiar pesos."),
+        "funding": ("Si la financiación descrita se completa y se transforma en inversión operativa, podría modificar capacidad o competencia; para empresas privadas el vínculo con esta cartera es indirecto y no se presume exposición directa a VT.", "El sistema vigila si la financiación se convierte en actividad verificable; un importe anunciado no se trata como ingreso ni como señal de compra."),
+        "acquisition": ("Si la adquisición descrita se cierra y su integración cambia costes, deuda o ingresos, podría modificar los flujos de caja de las empresas implicadas.", "El sistema vigila cierre, financiación e integración; las sinergias anunciadas no se incorporan como ganancias futuras."),
+        "products": ("Si el producto descrito logra adopción comercial y márgenes sostenibles, podría modificar ingresos, costes o competencia de las empresas implicadas.", "El sistema vigila adopción y resultados verificables; el lanzamiento no se convierte en una previsión de ventas ni en cambio de pesos."),
     }
     result = []
-    seen = set()
-    for _, _, identity, event in candidates:
-        if identity in seen:
+    seen_ids, seen_urls, seen_titles, seen_mechanisms = set(), set(), set(), set()
+    for _, _, identity, event, public, private, driver, mechanism_key in candidates:
+        normalized_title = " ".join("".join(character if character.isalnum() else " " for character in event["title"].lower()).split())
+        source_url = event["url"].split("#", 1)[0]
+        if identity in seen_ids or source_url in seen_urls or normalized_title in seen_titles or mechanism_key in seen_mechanisms:
             continue
-        seen.add(identity)
-        mechanism, implication = mechanisms.get(event.get("eventKind"),
-            ("Si el cambio descrito modifica beneficios o flujos de caja de forma persistente, podría afectar a empresas de la cartera global.",
-             "Contrastar resultados y exposición dentro del índice; ninguna operación se deriva automáticamente de esta noticia."))
-        result.append({"id": identity, "title": text(event.get("title"), 300), "url": event["url"],
-                       "sourceName": text(event.get("sourceName"), 100), "publishedAt": event["publishedAt"],
+        seen_ids.add(identity); seen_urls.add(source_url); seen_titles.add(normalized_title); seen_mechanisms.add(mechanism_key)
+        key = driver if event.get("eventKind") == "macro" and driver else event.get("eventKind")
+        mechanism, implication = mechanisms.get(key,
+            ("Si el cambio empresarial descrito modifica flujos de caja de forma persistente, podría afectar costes o resultados de las empresas implicadas.",
+             "El sistema vigila resultados verificables; este contexto no aporta evidencia suficiente para cambiar pesos."))
+        if public:
+            mechanism += " Cotizadas mencionadas: " + ", ".join(public) + "."
+            implication += " Una mención no verifica exposición ni peso dentro de VT."
+        elif private:
+            mechanism += " Empresas privadas mencionadas: " + ", ".join(private) + "."
+        if not event.get("summary") and not event.get("excerpt"):
+            mechanism += " Cobertura limitada al titular: no hay cifras financieras verificadas."
+        else:
+            mechanism += " Este contexto no verifica cifras financieras ni causalidad."
+        result.append({"id": identity, "title": event["title"], "url": event["url"],
+                       "sourceName": event["sourceName"], "publishedAt": event["publishedAt"],
                        "mechanism": mechanism, "implication": implication})
-        if len(result) == 8:
+        if len(result) == 3:
             break
     return result
 
@@ -601,8 +680,8 @@ def generate_report(data):
         reasons.append("Mantener la cartera real y revisar en la fecha prevista; un titular o movimiento diario no activa ventas automáticas.")
     if not enough:
         reasons.append("Falta una muestra común de 52 retornos semanales consecutivos: se muestran presupuestos y choques ilustrativos, sin inventar rentabilidad histórica.")
-    seed = int(hashlib.sha256(data["inputHash"].encode()).hexdigest()[:16], 16)
     projection_capital = actual_value if actual_value is not None else capital
+    seed = bootstrap_seed(dates, returns, weights, projection_capital, monthly, profile["horizonYears"])
     projections = bootstrap(returns, weights, projection_capital, monthly, profile["horizonYears"], seed) if enough and fresh_history and state != "unknown" and selection_state != "infeasible" else []
     alternatives = []
     for key, label in [("cautious", "Cauta"), ("balanced", "Equilibrada"), ("growth", "Mayor exposición a acciones")]:
