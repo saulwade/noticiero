@@ -819,3 +819,110 @@
     padding-right: 10px;
   }
 }
+
+.fi-daily {
+  border: 1px solid var(--fi-line);
+  border-radius: 6px;
+  padding: 22px 24px 0;
+  margin: 20px 0 6px;
+  min-width: 0;
+}
+.fi-daily-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.fi-daily-heading h2 {
+  font: 400 24px/1.25 var(--serif, Georgia, serif);
+  margin: 10px 0;
+}
+.fi-daily-fx {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.fi-daily-fx span,
+.fi-daily-fx small {
+  color: var(--fi-muted);
+  font-size: 10px;
+}
+.fi-daily-fx strong {
+  font: 400 27px/1.2 var(--serif, Georgia, serif);
+}
+.fi-daily-pending {
+  color: #8b7050;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.fi-daily .fi-compact > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.finance-workspace .fi-daily-sources {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+}
+.fi-daily-sources li {
+  border-top: 1px solid var(--fi-line);
+  padding: 14px 0;
+}
+.fi-daily-sources li > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  column-gap: 18px;
+}
+.fi-daily-sources strong {
+  font-weight: 500;
+}
+.fi-daily-sources span,
+.fi-daily-sources small,
+.fi-daily-sources p {
+  color: var(--fi-muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.fi-daily-sources p {
+  margin: 4px 0 0;
+}
+.fi-daily-sources .fi-daily-pending,
+.fi-daily-fx .fi-daily-pending {
+  color: #8b7050;
+}
+.fi-process ol {
+  display: grid;
+  gap: 16px;
+  padding-left: 22px;
+  margin: 0 0 24px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.fi-process li {
+  padding-left: 5px;
+}
+.fi-process strong {
+  font-weight: 500;
+}
+.fi-process p {
+  color: var(--fi-muted);
+  margin: 4px 0 0;
+}
+@media (max-width: 520px) {
+  .fi-daily {
+    padding: 20px 20px 0;
+  }
+  .fi-daily-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .fi-daily-fx {
+    align-items: flex-start;
+  }
+}

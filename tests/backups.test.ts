@@ -28,7 +28,20 @@ const snapshot = (): BackupSnapshot => ({
                 data: { alias: "Persona A", notes: "Contradicción importante" },
               },
             ]
-          : [],
+          : name === "finance_sync"
+            ? [
+                {
+                  id: "fx:USD/MXN",
+                  data: {
+                    id: "fx:USD/MXN",
+                    status: "ok",
+                    asOf: "2026-10-29",
+                    value: "20",
+                    provider: "Frankfurter",
+                  },
+                },
+              ]
+            : [],
   })),
 });
 describe("respaldo independiente cifrado", () => {
@@ -62,6 +75,10 @@ describe("respaldo independiente cifrado", () => {
         "SELECT data FROM interviews",
       );
       expect(result.rows[0].data.notes).toBe("Contradicción importante");
+      const financial = await db.query<{ data: { value: string } }>(
+        "SELECT data FROM finance_sync",
+      );
+      expect(financial.rows[0].data.value).toBe("20");
       await expect(restoreSnapshot(snapshot(), adapt(db))).rejects.toThrow(
         "base vacía",
       );

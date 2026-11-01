@@ -81,8 +81,23 @@ describe("registro operativo", () => {
       schema.jobs,
       schema.backupRuns,
       schema.operationAlerts,
+      schema.financeSync,
+      schema.financeInstruments,
     ])
       await db.delete(table);
+    const captured = new Date().toISOString();
+    await db.insert(schema.financeSync).values({
+      id: "fx:USD/MXN",
+      data: {
+        id: "fx:USD/MXN",
+        label: "USD/MXN",
+        provider: "Frankfurter",
+        status: "ok",
+        message: "Referencia sintética de salud",
+        lastSuccess: captured,
+        asOf: captured.slice(0, 10),
+      },
+    });
   });
   it("deduplica y resuelve el aviso después de recuperar el servicio", async () => {
     const first = await reconcileOperations();

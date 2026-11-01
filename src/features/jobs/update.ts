@@ -353,6 +353,13 @@ export async function runLocalUpdate(id: string) {
     await collectNews(id);
     await analyzeNews(id);
     await analyzeIdeas(id);
+    try {
+      const { syncDailyFinance } =
+        await import("@/features/finance/daily-sync");
+      await syncDailyFinance();
+    } catch {
+      // Operations detects missing/stuck finance state independently.
+    }
     await collectMarket(id);
     await finishUpdate(id);
   } catch {

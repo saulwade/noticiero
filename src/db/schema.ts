@@ -38,7 +38,13 @@ import type {
   FinanceThesis,
   FinanceDecision,
   CompanyResearch,
+  FinanceSyncState,
 } from "@/features/finance/types";
+
+export const financeSync = pgTable("finance_sync", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinanceSyncState>().notNull(),
+});
 
 export const financeInstruments = pgTable("finance_instruments", {
   id: text("id").primaryKey(),
@@ -181,6 +187,7 @@ export const backupRuns = pgTable("backup_runs", {
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
   ...[
+    "finance_sync",
     "finance_instruments",
     "finance_movements",
     "finance_marks",

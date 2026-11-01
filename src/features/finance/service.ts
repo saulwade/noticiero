@@ -1,3 +1,5 @@
+import { alphaVantageKey } from "./daily-providers";
+import { expectedUsClose } from "./market-calendar";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { getDb, resultRows } from "@/db/client";
@@ -10,6 +12,7 @@ import {
   financeDecisions,
   financeResearch,
   stories as storedStories,
+  financeSync,
 } from "@/db/schema";
 import { hash } from "@/features/news/normalize";
 import { calculatePortfolio, financeDay, replay } from "./engine";
@@ -28,7 +31,7 @@ import type {
 
 type Reader = Pick<Awaited<ReturnType<typeof getDb>>, "select">;
 async function load(reader: Reader, now = new Date()): Promise<FinanceData> {
-  const [ir, mr, pr, pol, tr, dr, rr] = await Promise.all([
+  const [ir, mr, pr, pol, tr, dr, rr, sync] = await Promise.all([
     reader.select().from(financeInstruments),
     reader.select().from(financeMovements),
     reader.select().from(financeMarks),
@@ -36,6 +39,7 @@ async function load(reader: Reader, now = new Date()): Promise<FinanceData> {
     reader.select().from(financeTheses),
     reader.select().from(financeDecisions),
     reader.select().from(financeResearch),
+    reader.select().from(financeSync),
   ]);
   const instruments = ir.map((r) => r.data),
     movements = mr.map((r) => r.data),
@@ -45,6 +49,14 @@ async function load(reader: Reader, now = new Date()): Promise<FinanceData> {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   return {
     instruments,
+    market: {
+      alphaVantageConfigured: Boolean(alphaVantageKey()),
+      expectedPriceSession: expectedUsClose(now),
+      sources: sync.map((r) => {
+        const { leaseToken: _, leaseUntil: __, ...state } = r.data; // eslint-disable-line @typescript-eslint/no-unused-vars
+        return state;
+      }),
+    },
     counts: {
       movements: mr.length,
       marks: pr.length,
@@ -332,9 +344,9 @@ export async function financeAction(raw: unknown) {
         !data.instruments.some((i) => i.id === input.instrumentId)
       )
         throw new Error("Instrumento no encontrado.");
-      if (data.marks.length >= 1000)
+      if (data.marks.length >= 20000)
         throw new Error(
-          "Máximo 1,000 valoraciones en esta etapa. No se borró el archivo.",
+          "Máximo 20,000 referencias en este archivo. No se borró el archivo.",
         );
       const { action: _, ...fields } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
       const mark: FinanceMark = {

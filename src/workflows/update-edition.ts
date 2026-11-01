@@ -7,6 +7,7 @@ export async function updateEdition(id: string) {
       await analysisStep(id, stories.slice(index, index + 2));
     }
     await ideasStep(id);
+    await financeStep();
     await marketStep(id);
     await finishStep(id);
   } catch {
@@ -47,4 +48,14 @@ async function failStep(id: string) {
   "use step";
   const { failUpdate } = await import("@/features/jobs/update");
   await failUpdate(id);
+}
+
+async function financeStep() {
+  "use step";
+  const { syncDailyFinance } = await import("@/features/finance/daily-sync");
+  try {
+    await syncDailyFinance();
+  } catch {
+    // Finance status is checked independently; preserve news publication on failure.
+  }
 }

@@ -23,6 +23,10 @@ import type {
   MovementKind,
 } from "@/features/finance/types";
 import { editionFor } from "@/lib/time";
+import {
+  FinanceDailyStatus,
+  FinanceProcessGuide,
+} from "./finance-daily-status";
 import "./finance-workspace.css";
 
 const movementNames: Record<MovementKind, string> = {
@@ -499,15 +503,18 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
                 <div className="fi-welcome">
                   <Wallet size={28} strokeWidth={1.2} />
                   <div>
-                    <h2>Tu cartera empieza con un registro.</h2>
+                    <h2>Primero diseñamos tu portafolio.</h2>
                     <p>
-                      Registra una aportación real y después tus compras. Tu
-                      reserva fuera del portafolio no se suma aquí. Las
-                      posiciones aparecerán con sus movimientos.
+                      Puedes explorar la herramienta sin registrar dinero.
+                      Cuando acordemos una distribución, registraremos solo tus
+                      aportaciones y compras reales. Tu reserva externa queda
+                      fuera del portafolio.
                     </p>
                   </div>
                 </div>
               ) : null}
+              <FinanceDailyStatus market={data.market} demo={demo} />
+              <FinanceProcessGuide />
               <div className="fi-two-columns">
                 <article className="fi-panel">
                   <span className="fi-eyebrow">LA SIGUIENTE APORTACIÓN</span>

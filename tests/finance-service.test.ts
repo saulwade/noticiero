@@ -12,6 +12,7 @@ const today = "2026-10-30";
 beforeEach(async () => {
   const db = await getDb();
   for (const table of [
+    t.financeSync,
     t.financeInstruments,
     t.financeMovements,
     t.financeMarks,
@@ -213,13 +214,14 @@ describe("archivo financiero independiente y auditable", () => {
     expect(view.viewLimited).toBe(true);
     expect(view.summary.valueMxn).toBe("1000");
   });
-  it("acepta respaldos anteriores completos22/26 y nuevos33, nunca parciales", () => {
+  it("acepta respaldos anteriores completos22/26 33/34, nunca parciales", () => {
     const tables = Object.keys(backupColumns).map((name) => ({
       name,
       rows: [],
     }));
     for (const set of [
       tables,
+      tables.filter((t) => t.name !== "finance_sync"),
       tables.filter((t) => !t.name.startsWith("finance_")),
       tables.filter(
         (t) =>

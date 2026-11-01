@@ -40,6 +40,26 @@ export type Movement = {
   createdAt: string;
   reversesId?: string;
 };
+export type FinanceSyncState = {
+  id: string;
+  label: string;
+  provider: string;
+  instrumentId?: string;
+  status: "running" | "ok" | "error" | "configuration" | "manual";
+  message: string;
+  session?: string;
+  lastAttempt?: string;
+  lastSuccess?: string;
+  asOf?: string;
+  value?: string;
+  leaseToken?: string;
+  leaseUntil?: string;
+};
+export type FinanceMarketStatus = {
+  alphaVantageConfigured: boolean;
+  expectedPriceSession: string;
+  sources: FinanceSyncState[];
+};
 export type FinanceMark = {
   id: string;
   kind: "price" | "fx";
@@ -49,6 +69,8 @@ export type FinanceMark = {
   source: string;
   sourceUrl?: string;
   capturedAt: string;
+  automatic?: boolean;
+  provider?: "alpha-vantage" | "frankfurter";
 };
 export type FinancePolicy = {
   monthlyContributionMxn: string;
@@ -133,6 +155,7 @@ export type CompanyResearch = {
   warnings: string[];
 };
 export type FinanceData = {
+  market?: FinanceMarketStatus;
   relatedNews?: {
     instrumentId: string;
     title: string;

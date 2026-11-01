@@ -7,6 +7,7 @@ import {
 import { gzipSync, gunzipSync } from "node:zlib";
 
 export const backupColumns: Record<string, string[]> = {
+  finance_sync: ["id", "data"],
   finance_instruments: ["id", "data"],
   finance_movements: ["id", "data"],
   finance_marks: ["id", "data"],
@@ -60,7 +61,9 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
     data.version !== 1 ||
     !Number.isFinite(Date.parse(data.createdAt)) ||
     !Array.isArray(data.tables) ||
-    ![22, 26, Object.keys(backupColumns).length].includes(data.tables.length)
+    ![22, 26, 33, Object.keys(backupColumns).length].includes(
+      data.tables.length,
+    )
   )
     throw new Error("Formato de respaldo incompatible.");
   const names = new Set<string>();
@@ -101,7 +104,9 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
       ? !name.startsWith("evidence_") && !name.startsWith("finance_")
       : data.tables.length === 26
         ? !name.startsWith("finance_")
-        : true,
+        : data.tables.length === 33
+          ? name !== "finance_sync"
+          : true,
   );
   if (required.some((name) => !names.has(name)))
     throw new Error("Faltan tablas de respaldo.");

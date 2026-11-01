@@ -36,7 +36,7 @@ test("portafolio demo honesto, sin movimientos ni consultas privadas", async ({
   ).toBeDisabled();
   await expect(
     portfolio.getByRole("heading", {
-      name: "Tu cartera empieza con un registro.",
+      name: "Primero diseñamos tu portafolio.",
     }),
   ).toBeVisible();
   await portfolio
@@ -419,4 +419,127 @@ test("portafolio: aportación, conversión, compra, referencias y diario persist
     ),
   ).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test("referencias diarias y guía sin registrar operaciones ni consultar proveedores al abrir", async ({
+  page,
+  isMobile,
+}) => {
+  const financeRequests: string[] = [];
+  const providerRequests: string[] = [];
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/finance"))
+      financeRequests.push(request.method());
+    if (
+      url.hostname.includes("alphavantage.co") ||
+      url.hostname.includes("frankfurter.dev")
+    )
+      providerRequests.push(url.hostname);
+  });
+  await page.route("**/api/finance", (route) =>
+    route.fulfill({
+      json: {
+        instruments: [],
+        movements: [],
+        marks: [],
+        theses: [],
+        decisions: [],
+        research: [],
+        market: {
+          alphaVantageConfigured: false,
+          expectedPriceSession: "2026-10-30",
+          sources: [
+            {
+              id: "fx:USD/MXN",
+              label: "USD/MXN",
+              provider: "Frankfurter",
+              status: "error",
+              message:
+                "La última consulta falló; se conserva la referencia anterior.",
+              lastAttempt: "2026-10-31T02:00:00Z",
+              lastSuccess: "2026-10-29T18:00:00Z",
+              asOf: "2026-10-29",
+              value: "20.1234",
+            },
+          ],
+        },
+        summary: {
+          asOf: "2026-10-30",
+          complete: true,
+          cash: { MXN: "0", USD: "0" },
+          knownValueMxn: "0",
+          valueMxn: "0",
+          contributionsMxn: "0",
+          withdrawalsMxn: "0",
+          pnlMxn: "0",
+          positions: [],
+          warnings: [],
+          allocation: [],
+          proposal: {
+            status: "blocked",
+            label: "Sin política aprobada",
+            reason: "Definir la distribución antes de operar.",
+            amountMxn: "0",
+            items: [],
+            missing: [],
+          },
+          performance: { reason: "Todavía no hay movimientos." },
+        },
+      },
+    }),
+  );
+  await page.goto("/");
+  const portfolio = await openFinance(page, isMobile);
+  await expect(
+    portfolio.getByRole("heading", {
+      name: "Primero diseñamos tu portafolio.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const references = portfolio.getByRole("article", {
+    name: "Referencias financieras diarias",
+  });
+  await expect(references).toContainText("20.1234");
+  await expect(references).toContainText("Referencia del 29 oct 2026");
+  await expect(references).toContainText(
+    "falta configurar una clave gratuita de Alpha Vantage",
+  );
+  await references
+    .getByText("Fuentes, fechas y cobertura", { exact: true })
+    .click();
+  await expect(references).toContainText("Por revisar");
+  await expect(references).toContainText("último intento 30 oct 2026");
+  await expect(references).toContainText(
+    "La última consulta falló; se conserva la referencia anterior.",
+  );
+  await expect(references).toContainText(
+    "Última sesión de cierre esperada: 30 oct 2026",
+  );
+  await expect(references).toContainText("BMV/SIC");
+  await expect(references).toContainText("No es el FIX de Banxico");
+  await portfolio.getByText("Cómo usar tu portafolio", { exact: true }).click();
+  await expect(portfolio).toContainText(
+    "Leer noticias no exige comprar o vender cada día.",
+  );
+  await expect(portfolio).toContainText(
+    "Noticiero no importa movimientos del broker ni ejecuta órdenes",
+  );
+  await expect(portfolio).toContainText(
+    "Cada mes revisamos tu nueva aportación",
+  );
+  await expect(portfolio).toContainText(
+    "Una revisión trimestral de la estrategia",
+  );
+  expect(financeRequests.length).toBeGreaterThan(0);
+  expect(financeRequests.every((method) => method === "GET")).toBe(true);
+  expect(providerRequests).toEqual([]);
+  expect(errors).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });
