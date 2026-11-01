@@ -304,7 +304,7 @@ describe("evidencia contextual y persistencia", () => {
       version: 1,
       createdAt: now.toISOString(),
       tables: Object.keys(backupColumns)
-        .filter((n) => !n.startsWith("evidence_"))
+        .filter((n) => !n.startsWith("evidence_") && !n.startsWith("finance_"))
         .map((name) => ({ name, rows: [] })),
     };
     expect(validateSnapshot(legacy).tables).toHaveLength(22);

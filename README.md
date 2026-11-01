@@ -4,6 +4,18 @@ Un briefing personal de tecnología, finanzas y operaciones de pequeñas empresa
 
 Instancia personal: [noticiero-self.vercel.app](https://noticiero-self.vercel.app). Requiere la cuenta de GitHub autorizada. Este dominio principal permite entrar desde teléfono sin iniciar sesión adicionalmente en Vercel; las URL de despliegues y vistas previas conservan la protección de Vercel.
 
+## Portafolio e investigación financiera
+
+**Mi portafolio** añade Resumen, Movimientos, Investigar y Diario dentro del mismo diseño. Los datos se cargan desde una API privada independiente; la demo permanece vacía y no consulta saldos. No hay conexión con un intermediario ni ejecución de operaciones.
+
+El MVP admite ocho instrumentos MXN/USD, hasta 2,000 movimientos y 1,000 referencias de precio/FX. Registro manual o CSV explícito, cálculo decimal de efectivo/unidades/aportaciones/resultado, política aprobada por el usuario, simulación de dinero nuevo antes de costos y capturas inmutables del diario. Se conservan originales, reversos, versiones de tesis y fechas de procedencia. Los historiales de política, tesis y decisiones tienen topes; se detiene la ampliación con un error visible sin borrar datos ni subir de plan. La vista es acotada y la exportación incluye el archivo completo. El respaldo cifrado cubre33 tablas y acepta snapshots anteriores completos de22 o26.
+
+Los precios/FX financieros **son manuales y fechados** en esta fase; no se activó una API de mercado nueva. La consulta SEC exige CIK explícito y conserva unidades/períodos/publicación, con seis solicitudes diarias como máximo. La prueba pública respondió bloqueada; los documentos/manuales siguen disponibles y no se promete acceso automático confirmado. Un dato ausente no es cero y una mención en una noticia no prueba impacto financiero.
+
+TWR/MWR solo aparecen con cobertura suficiente y reglas de fecha explícitas. No hay probabilidad de recuperación, optimización automática ni predictor. `scripts/finance-risk.py` es una referencia offline de estadística con Decimal, no un servicio desplegado; prueba con `python3 -B -m unittest discover -s tests/python`. Los resúmenes del briefing ahora seleccionan oraciones informativas del texto disponible mediante código local: se identifican como extractivos y conservan el idioma original. No se inventa una traducción ni un artículo completo cuando el feed es breve.
+
+El [plan técnico](docs/superpowers/plans/2026-10-31-finance-mvp.md) separa fases0–1 de históricos, modelos, automatizaciones y evaluación posteriores. El documento personal detallado permanece en `.data/private`, fuera de Git. Las funciones y los criterios del Radar de negocios permanecen separados.
+
 ## Arrancar en local
 
 Requiere Node.js 24.x. No necesita Docker ni credenciales para consultar las fuentes abiertas.

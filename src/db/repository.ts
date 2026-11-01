@@ -11,11 +11,12 @@ import type { DashboardData, Story, JobRun, SavedItem } from "@/lib/types";
 import { getValidationData } from "@/features/validation/service";
 import { getOperationsData } from "@/features/operations/service";
 import { getEvidenceData } from "@/features/evidence/service";
+import { summarizeLocally } from "@/features/analysis/local-summary";
 
 export async function getStories(): Promise<Story[]> {
   const db = await getDb();
   return (await db.select().from(tables.stories))
-    .map((row) => row.data)
+    .map((row) => summarizeLocally(row.data))
     .toSorted((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 }
 export async function saveStory(story: Story) {

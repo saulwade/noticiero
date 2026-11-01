@@ -22,6 +22,9 @@ export type Story = {
   detectedAt: string;
   excerpt: string;
   summary?: string;
+  summaryMethod?: "extractive";
+  summaryLanguage?: "es" | "en" | "unknown";
+  summaryVersion?: string;
   why?: string;
   category: Category;
   companies: string[];

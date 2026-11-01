@@ -7,6 +7,13 @@ import {
 import { gzipSync, gunzipSync } from "node:zlib";
 
 export const backupColumns: Record<string, string[]> = {
+  finance_instruments: ["id", "data"],
+  finance_movements: ["id", "data"],
+  finance_marks: ["id", "data"],
+  finance_policies: ["id", "data"],
+  finance_theses: ["id", "data"],
+  finance_decisions: ["id", "data"],
+  finance_research: ["id", "data"],
   evidence_records: ["id", "data"],
   evidence_reviews: ["id", "data"],
   evidence_connectors: ["id", "data"],
@@ -53,7 +60,7 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
     data.version !== 1 ||
     !Number.isFinite(Date.parse(data.createdAt)) ||
     !Array.isArray(data.tables) ||
-    ![22, Object.keys(backupColumns).length].includes(data.tables.length)
+    ![22, 26, Object.keys(backupColumns).length].includes(data.tables.length)
   )
     throw new Error("Formato de respaldo incompatible.");
   const names = new Set<string>();
@@ -89,14 +96,14 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
       }
     }
   }
-  const required = Object.keys(backupColumns).filter(
-    (name) => !name.startsWith("evidence_"),
+  const required = Object.keys(backupColumns).filter((name) =>
+    data.tables.length === 22
+      ? !name.startsWith("evidence_") && !name.startsWith("finance_")
+      : data.tables.length === 26
+        ? !name.startsWith("finance_")
+        : true,
   );
-  if (
-    required.some((name) => !names.has(name)) ||
-    (data.tables.length !== 22 &&
-      Object.keys(backupColumns).some((name) => !names.has(name)))
-  )
+  if (required.some((name) => !names.has(name)))
     throw new Error("Faltan tablas de respaldo.");
   return data;
 }

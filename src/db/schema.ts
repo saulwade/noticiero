@@ -30,6 +30,44 @@ import type {
   ConnectorState,
   EvidenceWeeklyReport,
 } from "@/features/evidence/types";
+import type {
+  Instrument,
+  Movement,
+  FinanceMark,
+  FinancePolicy,
+  FinanceThesis,
+  FinanceDecision,
+  CompanyResearch,
+} from "@/features/finance/types";
+
+export const financeInstruments = pgTable("finance_instruments", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<Instrument>().notNull(),
+});
+export const financeMovements = pgTable("finance_movements", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<Movement>().notNull(),
+});
+export const financeMarks = pgTable("finance_marks", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinanceMark>().notNull(),
+});
+export const financePolicies = pgTable("finance_policies", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinancePolicy>().notNull(),
+});
+export const financeTheses = pgTable("finance_theses", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinanceThesis>().notNull(),
+});
+export const financeDecisions = pgTable("finance_decisions", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinanceDecision>().notNull(),
+});
+export const financeResearch = pgTable("finance_research", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<CompanyResearch>().notNull(),
+});
 
 export const evidenceRecords = pgTable("evidence_records", {
   id: text("id").primaryKey(),
@@ -142,6 +180,18 @@ export const backupRuns = pgTable("backup_runs", {
 
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
+  ...[
+    "finance_instruments",
+    "finance_movements",
+    "finance_marks",
+    "finance_policies",
+    "finance_theses",
+    "finance_decisions",
+    "finance_research",
+  ].map(
+    (name) =>
+      `CREATE TABLE IF NOT EXISTS ${name} (id text PRIMARY KEY, data jsonb NOT NULL)`,
+  ),
   ...[
     "evidence_records",
     "evidence_reviews",

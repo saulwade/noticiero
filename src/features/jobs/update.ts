@@ -21,6 +21,7 @@ import { loadHackerNews } from "@/features/sources/hacker-news";
 import { loadFeed } from "@/features/sources/rss";
 import { rankStories, groupStories } from "@/features/news/deduplicate";
 import { summarize, ANALYSIS_VERSION } from "@/features/analysis/summarize";
+import { summarizeLocally } from "@/features/analysis/local-summary";
 import { aiConfig, analysisMode } from "@/features/analysis/config";
 import { loadCommunity } from "@/features/sources/community";
 import { loadRequestsForStartups } from "@/features/sources/yc";
@@ -155,6 +156,9 @@ export async function collectNews(id: string): Promise<void> {
               detectedAt: old.detectedAt,
               title: old.title,
               summary: old.summary,
+              summaryMethod: old.summaryMethod,
+              summaryLanguage: old.summaryLanguage,
+              summaryVersion: old.summaryVersion,
               why: old.why,
               analysis: old.analysis,
               analysisHash: old.analysisHash,
@@ -184,6 +188,16 @@ export async function analyzeNews(
   onlyIds?: string[],
 ): Promise<void> {
   const job = await activeJob(id);
+  if (analysisMode() === "local") {
+    for (const story of await storiesByIds(onlyIds ?? job.storyIds ?? [])) {
+      const result = summarizeLocally(story);
+      if (result !== story) {
+        await activeJob(id);
+        await saveStory(result);
+      }
+    }
+    return;
+  }
   if (analysisMode() !== "api" || !aiConfig().configured) return;
   const stories = await storiesByIds(onlyIds ?? job.storyIds ?? []);
   let failures = 0;

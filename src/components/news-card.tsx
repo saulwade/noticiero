@@ -24,7 +24,12 @@ export function NewsCard({
   onSave: () => void;
 }) {
   const [imageError, setImageError] = useState(false);
-  const excerpt = story.summary ?? story.excerpt;
+  const summary = story.summary?.trim();
+  const excerpt = summary || story.excerpt.trim();
+  const apiSummary = Boolean(summary && story.analysis === "ready");
+  const localSummary = Boolean(
+    summary && story.summaryMethod === "extractive" && !apiSummary,
+  );
   const sourceInitials =
     story.sourceId === "hn"
       ? "Y"
@@ -114,7 +119,23 @@ export function NewsCard({
           <h3>{story.title}</h3>
         </button>
         {excerpt ? (
-          <p className="story-summary">{excerpt}</p>
+          <p
+            className="story-summary"
+            lang={
+              apiSummary
+                ? "es"
+                : localSummary && story.summaryLanguage !== "unknown"
+                  ? story.summaryLanguage
+                  : undefined
+            }
+            title={
+              localSummary
+                ? "Selección de oraciones del contenido disponible, en el idioma original de la fuente."
+                : undefined
+            }
+          >
+            {excerpt}
+          </p>
         ) : (
           <p className="story-summary unavailable">
             Solo titular disponible. Abre la fuente para conocer la historia
@@ -140,14 +161,19 @@ export function NewsCard({
             Leer original <ArrowUpRight size={14} />
           </a>
           {story.references.length > 1 ? (
-            <span>{story.references.length} fuentes</span>
+            <span>
+              {story.references.length} fuentes
+              {localSummary ? " · Resumen extractivo" : ""}
+            </span>
           ) : (
             <span className="coverage-label">
-              {story.analysis === "ready"
+              {apiSummary
                 ? "Resumen en español"
-                : story.coverage === "headline"
-                  ? "Solo titular"
-                  : "Extracto original"}
+                : localSummary
+                  ? "Resumen extractivo · idioma original"
+                  : !excerpt || story.coverage === "headline"
+                    ? "Solo titular"
+                    : "Extracto original"}
             </span>
           )}
           <button

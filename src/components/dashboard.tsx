@@ -27,6 +27,7 @@ import {
   X,
   MessageSquare,
   ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import { NewsCard } from "./news-card";
 import { CompanyPanel } from "./company-panel";
@@ -36,6 +37,7 @@ import { ResearchWorkspace } from "./research-workspace";
 import { ValidationWorkspace } from "./validation-workspace";
 import { OperationsView } from "./operations-view";
 import { EvidenceWorkspace } from "./evidence-workspace";
+import { FinanceWorkspace } from "./finance-workspace";
 import {
   categories,
   type Category,
@@ -56,9 +58,11 @@ type View =
   | "settings"
   | "validation"
   | "operations"
+  | "finance"
   | "evidence";
 const navigation = [
   { id: "today" as const, label: "Mi briefing", icon: Newspaper },
+  { id: "finance" as const, label: "Mi portafolio", icon: Wallet },
   { id: "saved" as const, label: "Guardados", icon: Bookmark },
   { id: "ideas" as const, label: "Oportunidades", icon: Lightbulb },
   { id: "evidence" as const, label: "Radar de problemas", icon: Compass },
@@ -626,6 +630,8 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                 )
               }
             />
+          ) : view === "finance" ? (
+            <FinanceWorkspace demo={data.demo} />
           ) : view === "evidence" ? (
             <EvidenceWorkspace
               data={
