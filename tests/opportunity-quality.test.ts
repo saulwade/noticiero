@@ -227,4 +227,48 @@ describe("calidad de oportunidades con evidencia propia", () => {
     );
     expect(context.correction).toBe(false);
   });
+  it("mencionar workflow no convierte fallos distintos en una necesidad repetida", () => {
+    const items = [
+      record(
+        "loop",
+        "Our chatbot workflow freezes in an infinite loop when I use repeat message.",
+        { source: "github", product: "n8n-io/n8n" },
+      ),
+      record(
+        "trigger",
+        "Our workflow is triggered without any user prompt and the execution fails.",
+        { source: "github", product: "n8n-io/n8n" },
+      ),
+      record(
+        "payload",
+        "I cannot run the workflow because the API returns Unsupported parameter: messages.",
+        { source: "github", product: "n8n-io/n8n" },
+      ),
+      record(
+        "timezone",
+        "The workflow cannot be activated: Expression evaluation failed: Invalid timezone America/Dallas.",
+        { source: "github", product: "n8n-io/n8n" },
+      ),
+    ];
+    const groups = buildDossiers(items, [], now);
+    expect(groups).toHaveLength(4);
+    expect(groups.every((d) => d.status === "isolated")).toBe(true);
+    expect(new Set(groups.map((d) => d.scope?.task)).size).toBe(4);
+  });
+  it("soporte o trabajo manual sin una tarea identificada permanecen aislados", () => {
+    const groups = buildDossiers(
+      [
+        record("support-a", "I cannot get support for our app.", {
+          product: "Example",
+        }),
+        record("support-b", "We cannot get support for our app either.", {
+          product: "Example",
+        }),
+      ],
+      [],
+      now,
+    );
+    expect(groups).toHaveLength(2);
+    expect(groups.every((d) => d.status === "isolated")).toBe(true);
+  });
 });

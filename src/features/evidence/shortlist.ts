@@ -2,6 +2,7 @@ import { problemContext } from "./engine";
 import type { EvidenceRecord, ProblemDossier, ResearchLead } from "./types";
 import { authoredText } from "@/features/research/evidence-text";
 import { latestEvidenceVersions } from "./versions";
+import { isSpecificScope } from "@/features/research/problem-scope";
 
 export function evidenceCoverage(records: EvidenceRecord[]) {
   const latest = latestEvidenceVersions(records);
@@ -38,6 +39,7 @@ export function researchShortlist(
       });
       if (
         !d.scope ||
+        !isSpecificScope(d.scope) ||
         d.identifiedAuthors + d.anonymousCases < 2 ||
         !d.fields.obstacle ||
         active.length < 2

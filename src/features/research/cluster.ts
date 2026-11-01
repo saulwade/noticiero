@@ -2,7 +2,7 @@ import type { ResearchModel, ResearchNote, ResearchSignal } from "@/lib/types";
 import { hash } from "@/features/news/normalize";
 import { editionFor } from "@/lib/time";
 import { keywords } from "./vector";
-import { problemScope } from "./problem-scope";
+import { isSpecificScope, problemScope } from "./problem-scope";
 
 export function topicLabel(tokens: string[]) {
   return problemScope(tokens.join(" "))?.label ?? "Necesidad por clasificar";
@@ -24,14 +24,17 @@ export function clusterSignals(
   )) {
     const scope = problemScope(signal.quote);
     if (!scope) continue;
-    const members = groups.get(scope.key) ?? [];
+    const key = isSpecificScope(scope)
+      ? scope.key
+      : `${scope.key}:${signal.id}`;
+    const members = groups.get(key) ?? [];
     if (
       !members.some(
         (m) => m.storyId === signal.storyId && m.quote === signal.quote,
       )
     )
       members.push(signal);
-    groups.set(scope.key, members);
+    groups.set(key, members);
   }
   const used = new Set<string>();
   return [...groups]

@@ -8,6 +8,13 @@ export type ProblemScope = {
   product: string;
   domain: string;
 };
+/** These generic words preserve an observation but cannot establish a shared job. */
+export function isSpecificScope(scope: ProblemScope) {
+  return (
+    !["support", "manual-work"].includes(scope.task) &&
+    !(scope.task === "payments" && scope.domain === "general")
+  );
+}
 const tasks: [string, string, RegExp][] = [
   [
     "account-region",
@@ -40,9 +47,39 @@ const tasks: [string, string, RegExp][] = [
     /\b(?:incorrect|inaccurate|dispute|credit report|group=null|getcategories|updatecategory|datos incorrectos|informacion incorrecta|corregir registros)\b/,
   ],
   [
-    "workflow-execution",
-    "Ejecutar y recuperar automatizaciones",
-    /\b(?:workflow\w*|chatbot\w*|automations?|automatizaciones|reintentar|retry|retries)\b/,
+    "workflow-loop",
+    "Evitar bucles y ejecuciones repetidas",
+    /\b(?:infinite loop|endless loop|repeat message|bucle infinito|bucle sin fin)\b/,
+  ],
+  [
+    "unexpected-trigger",
+    "Evitar activaciones sin una solicitud",
+    /\b(?:trigger\w*|dispar\w*)\b[\s\S]{0,100}\b(?:without|sin)\b/,
+  ],
+  [
+    "missed-notification",
+    "Recibir notificaciones sin omisiones",
+    /\b(?:email\w*|notification\w*|correo\w*|notificaci\w*)\b[\s\S]{0,90}\b(?:not detected|miss\w*|no detect\w*|no recib\w*)\b|\b(?:miss\w*|not detect\w*)\b[\s\S]{0,60}\b(?:email\w*|notification\w*)\b/,
+  ],
+  [
+    "api-contract",
+    "Adaptar parámetros y contratos de APIs",
+    /\b(?:unsupported parameter|invalid payload|incompatible schema|parametro no soportado|parametro no admitido)\b/,
+  ],
+  [
+    "timezone-conversion",
+    "Corregir conversiones de zonas horarias",
+    /\b(?:invalid timezone|timezone conversion|zona horaria invalida|conversion de zona horaria)\b/,
+  ],
+  [
+    "runtime-resources",
+    "Reducir consumo excesivo de recursos",
+    /\b(?:cpu|memory|memoria)\b[\s\S]{0,90}\b(?:usage|overhead|cost|excess\w*|consumo)\b|\b(?:excessive|high|sustained|excesivo)\b[\s\S]{0,60}\b(?:cpu|memory|memoria)\b/,
+  ],
+  [
+    "workflow-recovery",
+    "Recuperar ejecuciones fallidas",
+    /\b(?:retry|retries|recover\w*|re-?queu\w*|reintent\w*|recuperar)\b[\s\S]{0,60}\b(?:workflow\w*|jobs?|ejecucion\w*|tareas?)\b/,
   ],
   ["payroll", "Preparar nómina y pagos al personal", /\b(?:payroll|nomina)\b/],
   [
@@ -118,9 +155,20 @@ export function problemScope(
   const specific = matches.filter(
     (m) => !["manual-work", "payments", "support"].includes(m.task[0]),
   );
-  const task = (specific.length ? specific : matches).sort(
-    (a, b) => a.index - b.index,
-  )[0]?.task;
+  const rootCauses = specific.filter((m) =>
+    [
+      "workflow-loop",
+      "unexpected-trigger",
+      "missed-notification",
+      "api-contract",
+      "timezone-conversion",
+      "runtime-resources",
+      "workflow-recovery",
+    ].includes(m.task[0]),
+  );
+  const task = (
+    rootCauses.length ? rootCauses : specific.length ? specific : matches
+  ).sort((a, b) => a.index - b.index)[0]?.task;
   if (!task) return;
   const role = normalized.match(rolePattern)?.[0] ?? "";
   const roleKey = /accountant|contador|contable|bookkeeper/.test(role)

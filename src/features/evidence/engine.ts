@@ -13,7 +13,10 @@ import {
   rolePattern,
 } from "@/features/research/evidence-text";
 import { classifySignal } from "@/features/research/signals";
-import { problemScope } from "@/features/research/problem-scope";
+import {
+  isSpecificScope,
+  problemScope,
+} from "@/features/research/problem-scope";
 import { latestEvidenceVersions } from "./versions";
 
 export const ENGINE_VERSION = "evidence-v2";
@@ -86,7 +89,11 @@ export function problemContext(record: EvidenceRecord) {
 }
 function groupKey(record: EvidenceRecord, topic: string) {
   const scope = problemContext(record).scope;
-  return `${scope?.key ?? `${topic}:${normalized(record.product ?? record.source)}`}:${record.country ?? "unknown"}`;
+  const specificity =
+    scope && !isSpecificScope(scope)
+      ? `:${record.source}:${record.externalId}`
+      : "";
+  return `${scope?.key ?? `${topic}:${normalized(record.product ?? record.source)}`}:${record.country ?? "unknown"}${specificity}`;
 }
 export function buildDossiers(
   records: EvidenceRecord[],
