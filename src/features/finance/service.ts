@@ -59,7 +59,11 @@ async function load(reader: Reader, now = new Date()): Promise<FinanceData> {
       alphaVantageConfigured: Boolean(alphaVantageKey()),
       expectedPriceSession: expectedUsClose(now),
       sources: sync
-        .filter((r) => !["news-research", "automatic-analysis"].includes(r.id))
+        .filter(
+          (r) =>
+            !["news-research", "automatic-analysis"].includes(r.id) &&
+            !r.id.startsWith("stock-"),
+        )
         .map((r) => {
           const { leaseToken: _, leaseUntil: __, ...state } = r.data; // eslint-disable-line @typescript-eslint/no-unused-vars
           return state;

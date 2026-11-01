@@ -8,6 +8,7 @@ import type {
   AutomationHistory,
   AutomationReference,
 } from "./automatic-types";
+import { researchIssuers } from "./stock-catalog";
 
 export const AUTOMATION_ASSETS: AutomationAsset[] = [
   {
@@ -182,8 +183,12 @@ export async function fetchWeeklyHistory(
   options: Options = {},
 ): Promise<AutomationHistory> {
   if (
-    !AUTOMATION_ASSETS.some(
-      (a) => a.symbol === asset.symbol && a.currency === "USD",
+    !(
+      AUTOMATION_ASSETS.some(
+        (a) => a.symbol === asset.symbol && a.currency === "USD",
+      ) ||
+      (asset.currency === "USD" &&
+        researchIssuers.some((i) => i.symbol === asset.symbol))
     ) ||
     !Number.isFinite(now.getTime())
   )

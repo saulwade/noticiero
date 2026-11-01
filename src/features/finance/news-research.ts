@@ -18,8 +18,9 @@ import type {
   FinanceNewsEvent,
   FinancialEventKind,
 } from "./research-types";
+import { findResearchIssuers, researchIssuers } from "./stock-catalog";
 
-export const FINANCE_NEWS_ENGINE_VERSION = "finance-news-v2";
+export const FINANCE_NEWS_ENGINE_VERSION = "finance-news-v3";
 const normalize = (text: string) =>
   text
     .toLowerCase()
@@ -85,7 +86,7 @@ const kinds: {
     kind: "acquisition",
     topic: "Adquisiciones y acuerdos",
     pattern:
-      /\b(acquisit\w*|acquir\w*|merger\w*|takeover\w*|buyout\w*|adquisicion\w*|fusion\w*|compra de empresa\w*)\b/,
+      /\b(acquisit\w*|acquir\w*|merger\w*|takeover\w*|buyout\w*|buys? (?:a |the |rival |another )?(?:\w+ ){0,3}(?:brand|company|business)|adquisicion\w*|adquiere|fusion\w*|compra (?:de )?(?:una |la )?(?:empresa|marca))\b/,
     hypothesis:
       "Si se confirma y concreta el acuerdo, conviene revisar precio, financiación y condiciones; rumores, propuestas y cierres consumados son etapas distintas.",
     questions: [
@@ -244,7 +245,10 @@ function validInstant(value: string, now: Date) {
 }
 function companyMentions(text: string): FinanceNewsEvent["companies"] {
   const normalized = normalize(text);
-  const found = new Set(findCompanies(text));
+  const found = new Set([
+    ...findCompanies(text),
+    ...findResearchIssuers(text).map((i) => i.symbol),
+  ]);
   for (const company of catalog)
     if (
       company.symbol.length >= 3 &&
@@ -286,9 +290,16 @@ function companyMentions(text: string): FinanceNewsEvent["companies"] {
   )
     found.delete("AMZN");
   return [...found].sort().flatMap((symbol) => {
-    const company = getCompany(symbol);
+    const company =
+      getCompany(symbol) ?? researchIssuers.find((i) => i.symbol === symbol);
     return company
-      ? [{ symbol, name: company.name, private: Boolean(company.private) }]
+      ? [
+          {
+            symbol,
+            name: company.name,
+            private: "private" in company && Boolean(company.private),
+          },
+        ]
       : [];
   });
 }

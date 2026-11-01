@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "finance_quant.py"
+sys.path.insert(0, str(SCRIPT.parent))
 
 
 def fixture(n=80):
@@ -54,6 +55,41 @@ class QuantTest(unittest.TestCase):
 
     def report(self, value=None):
         return self.engine.generate_report(value or fixture())
+
+    def test_missing_history_applies_horizon_limits_and_blocks_execution(self):
+        value = fixture(); value["histories"] = []
+        value["profile"].update(riskPreference="growth", horizonYears=1)
+        result = self.report(value)
+        self.assertLessEqual(result["initial"]["items"][0]["weight"], .2)
+        self.assertGreaterEqual(result["initial"]["items"][2]["weight"], .5)
+        self.assertEqual(result["action"], "wait")
+        self.assertEqual(result["contribution"]["items"][2]["weight"], 1)
+        self.assertTrue(all("quantity" not in row for row in result["initial"]["items"]))
+
+    def test_actual_drift_requires_review_even_without_monthly_money(self):
+        value = fixture(); value["profile"].update(riskPreference="cautious", monthlyContributionMxn="0")
+        value["portfolio"].update(hasMovements=True, valueMxn="10000", cashMxn="0",
+            positions=[{"symbol": "VT", "valueMxn": "10000", "quantity": "5"}])
+        result = self.report(value)
+        self.assertEqual(result["action"], "review-risk")
+        self.assertNotIn("Conservar el plan", result["conclusion"])
+        self.assertGreater(result["actualRisk"]["maximumWeightDrift"], .5)
+        self.assertLess(result["actualRisk"]["scenarios"][0]["returnPercent"], result["scenarios"][0]["returnPercent"])
+
+    def test_unconfirmed_infeasible_preserves_provisional_contract(self):
+        value = volatile_fixture(.5, .5)
+        result = self.report(value)
+        self.assertEqual(result["status"], "provisional")
+        self.assertEqual(result["action"], "wait")
+
+    def test_real_zero_has_no_concentration_drift_with_or_without_contributions(self):
+        for monthly in ("0", "100"):
+            value = fixture(); value["profile"].update(riskPreference="cautious", monthlyContributionMxn=monthly)
+            value["portfolio"].update(hasMovements=True, valueMxn="0", cashMxn="0", positions=[])
+            result = self.report(value)
+            self.assertEqual(result["actualRisk"]["maximumWeightDrift"], 0)
+            self.assertEqual(result["action"], "maintain" if monthly == "0" else "contribute")
+            self.assertTrue(all(s["endValueMxn"] == "0.00" for s in result["actualRisk"]["scenarios"]))
 
     def test_no_history_keeps_visible_provisional_budget_and_no_fake_metrics(self):
         value = fixture(); value["histories"] = []
@@ -117,7 +153,7 @@ class QuantTest(unittest.TestCase):
         self.assertTrue(any("horizonte" in x.lower() for x in result["reasons"]))
         value["histories"] = []
         no_data = self.report(value)
-        self.assertEqual([x["weight"] for x in no_data["initial"]["items"]], [.35, .4, .25])
+        self.assertEqual([x["weight"] for x in no_data["initial"]["items"]], [.2, .3, .5])
         self.assertTrue(any("pendiente" in x.lower() and "límites" in x.lower() for x in no_data["reasons"]))
 
     def test_no_feasible_allocation_waits_without_quantities_or_projection(self):

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { decimal, formatted, multiply, SCALE } from "./decimal";
 import { validDay } from "./market-calendar";
 import type { AutomationInput, AutomationReport } from "./automatic-types";
+import { stockReportSchema, validateStockReport } from "./stock-validation";
 
 const text = z.string().trim().min(1).max(4000);
 const money = z.string().regex(/^\d{1,12}(?:\.\d{1,8})?$/);
@@ -55,7 +56,7 @@ const budget = z
     cashRemainderMxn: capital,
   })
   .strict();
-export const automationReportSchema = z
+const baseAutomationReportSchema = z
   .object({
     version: z.literal(1),
     id: z.string().min(1).max(160),
@@ -177,6 +178,39 @@ export const automationReportSchema = z
   })
   .strict();
 
+export const automationReportSchema = baseAutomationReportSchema
+  .extend({
+    stockResearch: stockReportSchema.optional(),
+    actualRisk: z
+      .object({
+        weights: z
+          .array(z.object({ symbol: text.max(20), weight }).strict())
+          .max(3),
+        maximumWeightDrift: weight,
+        risk: baseAutomationReportSchema.shape.risk,
+        scenarios: baseAutomationReportSchema.shape.scenarios,
+      })
+      .strict()
+      .optional(),
+    evaluation: z
+      .object({
+        method: text,
+        folds: finite.int().min(0).max(20),
+        attemptedFolds: finite.int().min(1).max(20),
+        infeasibleFolds: finite.int().min(0).max(20),
+        trainingWeeks: z.literal(104),
+        testWeeks: z.literal(13),
+        estimatedVolatility: finite.min(0).max(100).optional(),
+        realizedVolatility: finite.min(0).max(100).optional(),
+        baselineRealizedVolatility: finite.min(0).max(100).optional(),
+        breaches: finite.int().min(0).max(20),
+        caveat: text,
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export function canonicalAutomation(value: unknown): string {
   if (Array.isArray(value))
     return `[${value.map(canonicalAutomation).join(",")}]`;
@@ -196,6 +230,14 @@ export function automationInputHash(
     ...rest,
     inputHash: undefined,
     asOf: Math.floor(Date.parse(asOf) / 1_800_000),
+    ...(input.stockResearch
+      ? {
+          stockResearch: {
+            ...input.stockResearch,
+            asOf: Math.floor(Date.parse(input.stockResearch.asOf) / 1_800_000),
+          },
+        }
+      : {}),
   };
   return createHash("sha256").update(canonicalAutomation(value)).digest("hex");
 }
@@ -391,6 +433,94 @@ export function validateAutomationReport(
   const scenarioBase = Number(
     knownPortfolio ? input.portfolio.valueMxn : input.profile.initialCapitalMxn,
   );
+  const common = [...commonDates].sort((a, b) => a.date.localeCompare(b.date));
+  let consecutive = common.length ? 1 : 0;
+  for (let i = 1; i < common.length; i++) {
+    const gap =
+      (Date.parse(common[i].date) - Date.parse(common[i - 1].date)) / 86400000;
+    consecutive = gap >= 4 && gap <= 10 ? consecutive + 1 : 1;
+  }
+  const historyReady =
+    consecutive >= 53 &&
+    input.histories.length >= 2 &&
+    input.histories.every(
+      (h) =>
+        h.adjusted &&
+        h.currency === "USD" &&
+        Date.parse(h.capturedAt) <= Date.parse(input.asOf),
+    ) &&
+    Date.parse(input.asOf.slice(0, 10)) -
+      Date.parse(common.at(-1)?.date ?? "") <=
+      14 * 86400000;
+  if (
+    report.projections.length &&
+    (!historyReady ||
+      report.risk.observations < 52 ||
+      report.status === "insufficient-data" ||
+      (input.portfolio.hasMovements && !knownPortfolio))
+  )
+    fail();
+  if (
+    report.evaluation &&
+    (!historyReady ||
+      report.risk.observations < 117 ||
+      report.evaluation.attemptedFolds !==
+        Math.floor((report.risk.observations - 104) / 13) ||
+      report.evaluation.folds + report.evaluation.infeasibleFolds !==
+        report.evaluation.attemptedFolds ||
+      report.evaluation.breaches > report.evaluation.folds ||
+      [
+        report.evaluation.estimatedVolatility,
+        report.evaluation.realizedVolatility,
+        report.evaluation.baselineRealizedVolatility,
+      ].some((v) => (v !== undefined) !== report.evaluation!.folds > 0))
+  )
+    fail();
+  if (report.actualRisk) {
+    if (!knownPortfolio || report.actualRisk.weights.length !== 3) fail();
+    const actual = report.actualRisk,
+      total = Number(input.portfolio.valueMxn);
+    const actualWeights = new Map(
+      actual.weights.map((w) => [w.symbol, w.weight]),
+    );
+    if (actualWeights.size !== 3) fail();
+    const objective = new Map(
+      report.initial.items.map((w) => [w.symbol, w.weight]),
+    );
+    let drift = 0;
+    for (const symbol of ["VT", "SGOV", "MXN-CASH"]) {
+      const value =
+        symbol === "MXN-CASH"
+          ? Number(input.portfolio.cashMxn)
+          : input.portfolio.positions
+              .filter((p) => p.symbol === symbol)
+              .reduce((s, p) => s + Number(p.valueMxn), 0);
+      const expected = total > 0 ? value / total : 0;
+      if (Math.abs((actualWeights.get(symbol) ?? -1) - expected) > 1e-8) fail();
+      if (total > 0)
+        drift = Math.max(
+          drift,
+          Math.abs(expected - (objective.get(symbol) ?? 0)),
+        );
+    }
+    if (
+      Math.abs(drift - actual.maximumWeightDrift) > 1e-8 ||
+      actual.risk.observations !== report.risk.observations ||
+      actual.risk.from !== report.risk.from ||
+      actual.risk.to !== report.risk.to
+    )
+      fail();
+    for (const scenario of actual.scenarios) {
+      const expected = total * (1 + scenario.returnPercent / 100);
+      if (
+        Math.abs(Number(scenario.endValueMxn) - expected) >
+        0.02 + total * 0.000000005
+      )
+        fail();
+    }
+    if (drift > 0.05 + 1e-8 && total > 0 && report.action === "maintain")
+      fail();
+  }
   for (const scenario of report.scenarios) {
     const expected = scenarioBase * (1 + scenario.returnPercent / 100);
     const tolerance = 0.02 + scenarioBase * 0.000000005;
@@ -412,6 +542,7 @@ export function validateAutomationReport(
       fail();
   }
   if (new Set(report.news.map((n) => n.id)).size !== report.news.length) fail();
+  validateStockReport(report.stockResearch, input, canonicalAutomation, fail);
   for (const review of [
     report.nextReview.daily,
     report.nextReview.contribution,

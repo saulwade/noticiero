@@ -32,7 +32,9 @@ El archivo financiero conjunto tiene un tope de 50 MB, 1,100 informes automátic
 
 Pruebas Python: `python -B -m unittest discover -s tests/python` en el entorno con `requirements-finance.txt`. `scripts/finance-risk.py` sigue como referencia descriptiva offline. El motor diario nuevo es `scripts/finance_quant.py`. Las proyecciones son condicionales a una muestra histórica y supuestos explícitos; no son probabilidades futuras calibradas. Modelos predictivos, evaluación fuera de muestra de señales de trading y cobertura automática universal siguen sin presentarse como funcionalidades validadas.
 
-Plan actual: [portafolio automático](docs/superpowers/plans/2026-11-01-automatic-portfolio.md). Los planes anteriores conservan el historial del [registro inicial](docs/superpowers/plans/2026-10-31-finance-mvp.md), [referencias diarias](docs/superpowers/plans/2026-10-31-finance-daily-data.md) y [archivo de noticias](docs/superpowers/plans/2026-10-31-finance-news-research.md). La propuesta personal detallada permanece en `.data/private`.
+La investigación automática de acciones incluye emisores relacionados, relaciones con fuentes primarias y fecha, fundamentos SEC o resultados normalizados Alpha con cobertura explícita y estadística individual cuando hay historia suficiente. Hasta seis candidatos, tres consultas de fundamentales y un histórico por ciclo; caché semanal, cuota compartida y sin crear posiciones. Se consulta dentro de Qué hacer y por qué → Más allá del titular. El diagnóstico temporal de riesgo declara bloques intentados y abstenciones; no es una señal de trading validada.
+
+Plan actual: [investigación de acciones y auditoría](docs/superpowers/plans/2026-11-01-stock-evidence-and-overnight-audit.md) y [portafolio automático](docs/superpowers/plans/2026-11-01-automatic-portfolio.md). Los planes anteriores conservan el historial del [registro inicial](docs/superpowers/plans/2026-10-31-finance-mvp.md), [referencias diarias](docs/superpowers/plans/2026-10-31-finance-daily-data.md) y [archivo de noticias](docs/superpowers/plans/2026-10-31-finance-news-research.md). La propuesta personal detallada permanece en `.data/private`.
 
 ## Arrancar en local
 
@@ -52,7 +54,7 @@ La vista [/?demo=1](http://127.0.0.1:3001/?demo=1) permite explorar ejemplos ide
 ## Qué funciona sin claves
 
 - Recopilación de Hacker News, Ask HN, Show HN, respuestas públicas limitadas de esos hilos, Y Combinator (blog y Requests for Startups), Ars Technica, The Verge, TechCrunch y WIRED, según disponibilidad.
-- Finanzas y operaciones: CNBC Finance, Reserva Federal, Banking Dive y Small Business Trends mediante sus feeds publicados. Los comunicados y artículos son contexto; las señales de demanda se extraen de solicitudes/experiencias de personas, no de una noticia editorial.
+- Finanzas y operaciones: CNBC Finance, CNBC Empresas, CNBC Resultados, Reserva Federal, Banking Dive y Small Business Trends mediante sus feeds publicados. Los comunicados y artículos son contexto; las señales de demanda se extraen de solicitudes/experiencias de personas, no de una noticia editorial.
 - Fechas originales, atribución, enlaces, extractos y fotos publicadas en feeds cuando existen; sin descargar páginas de suscripción.
 - Agrupación conservadora de duplicados, búsqueda, filtros por tema/edición, noticias leídas y guardados persistentes.
 - Empresas detectadas por menciones de su nombre o productos en el texto disponible, con catálogo de tickers y enlaces a Yahoo Finance. No se afirma que esas menciones demuestren impacto causal.

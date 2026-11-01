@@ -187,6 +187,34 @@ function newsFixture(
 }
 
 describe("preparación y archivo automático sin registrar inversiones", () => {
+  it("investiga relaciones de compañías privadas aunque no entren al contexto bursátil base", async () => {
+    await seed();
+    const db = await getDb(),
+      source = providers();
+    const privateEvent = newsFixture("private-infrastructure", {
+      title: "OpenAI announces GPU data center infrastructure expansion",
+      eventKind: "infrastructure",
+      companies: [{ symbol: "OPENAI", name: "OpenAI", private: true }],
+    });
+    await db
+      .insert(t.financeNewsEvents)
+      .values({ id: privateEvent.id, data: privateEvent });
+    const stocks = vi.fn(
+      async (events: FinanceNewsEvent[], clock: Date = now) => ({
+        version: 1 as const,
+        asOf: clock.toISOString(),
+        candidates: [],
+        warnings: [String(events.length)],
+      }),
+    );
+    source.stocks = stocks;
+    const input = await prepareAutomationInput(now, source);
+    expect(input.news).toEqual([]);
+    expect(stocks.mock.calls[0][0].map((event) => event.id)).toContain(
+      privateEvent.id,
+    );
+    expect(input.stockResearch?.warnings).toEqual(["1"]);
+  });
   it("GET sin perfil solo informa configuración y no consulta red", async () => {
     const network = vi
       .spyOn(globalThis, "fetch")
@@ -311,6 +339,24 @@ describe("preparación y archivo automático sin registrar inversiones", () => {
         asOf: new Date(now.getTime() + 10_000).toISOString(),
       }),
     ).toBe(input.inputHash);
+  });
+  it("rechaza proyecciones sin muestra suficiente y sin cartera conciliada", async () => {
+    await seed();
+    const input = await prepareAutomationInput(now, providers());
+    input.histories = [];
+    input.inputHash = automationInputHash(input);
+    const report = cashReport(input);
+    report.projections = [
+      {
+        years: 1,
+        lowerMxn: "9000000",
+        medianMxn: "9999999",
+        upperMxn: "10000000",
+        method: "Inventado",
+        caveat: "No basta ordenar percentiles.",
+      },
+    ];
+    expect(() => validateAutomationReport(report, input, now)).toThrow();
   });
   it("valida presupuesto, pesos, fuentes, noticias y números no finitos", async () => {
     await seed();

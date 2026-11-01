@@ -153,6 +153,7 @@ export type FinancialFact = {
   start?: string;
   end: string;
   filed: string;
+  filedKind?: "observed";
   accession: string;
   form: string;
   url: string;
@@ -163,6 +164,7 @@ export type CompanyResearch = {
   capturedAt: string;
   source: string;
   facts: FinancialFact[];
+  comparisonFacts?: FinancialFact[];
   warnings: string[];
 };
 export type FinanceData = {

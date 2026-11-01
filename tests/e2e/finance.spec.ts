@@ -155,6 +155,96 @@ test("propuesta automática sin posiciones: importes, fracciones, motivos y esce
   await noOverflow(page);
 });
 
+test("investigación relacionada es automática, desplegable y mantiene tres pestañas", async ({
+  page,
+  isMobile,
+}) => {
+  const data = structuredClone(fixture());
+  data.automation!.current!.stockResearch = {
+    context: {
+      version: 1,
+      asOf: "2026-11-01T12:00:00Z",
+      warnings: [],
+      candidates: [
+        {
+          symbol: "SUPPLIER",
+          name: "Proveedor de prueba",
+          cik: "0000000001",
+          exchange: "NASDAQ",
+          origin: "related",
+          events: [
+            {
+              id: "synthetic",
+              title: "Inversión sintética en infraestructura",
+              url: "https://example.com/source",
+              sourceName: "Fuente de prueba",
+              publishedAt: "2026-10-31T12:00:00Z",
+            },
+          ],
+          links: [
+            {
+              id: "synthetic-link",
+              fromSymbol: "SAMPLE",
+              fromName: "Cliente de prueba",
+              kind: "supplier",
+              description: "Relación documentada de prueba.",
+              mechanism:
+                "Si se confirma el pedido, podrían variar los ingresos.",
+              counterpoint: "La expansión puede retrasarse.",
+              sourceUrl: "https://example.com/relation",
+              sourceDate: "2026-10-01",
+            },
+          ],
+        },
+      ],
+    },
+    caveat: "No es una incorporación a tu cartera.",
+    analyses: [
+      {
+        symbol: "SUPPLIER",
+        status: "partial",
+        metrics: [
+          {
+            key: "synthetic-margin",
+            label: "Margen de prueba",
+            value: 0.2,
+            unit: "ratio",
+            period: "2026-04-01 / 2026-06-30",
+            factIndexes: [0, 1],
+          },
+        ],
+        findings: ["Balance y valoración pendientes."],
+        questions: ["¿Qué dato invalidaría la hipótesis?"],
+      },
+    ],
+  };
+  await page.route("**/api/finance", (route) => route.fulfill({ json: data }));
+  await page.goto("/");
+  const portfolio = await openFinance(page, isMobile);
+  await portfolio
+    .getByRole("button", { name: "Qué hacer y por qué", exact: true })
+    .click();
+  const research = portfolio.getByRole("region", {
+    name: "Investigación automática de empresas relacionadas",
+  });
+  await expect(
+    research.getByText("Proveedor de prueba", { exact: false }).first(),
+  ).not.toBeVisible();
+  await research.getByText("Más allá del titular.", { exact: true }).click();
+  await expect(research).toContainText("20 %");
+  await expect(
+    research.getByText("Relación documentada de prueba."),
+  ).toBeVisible();
+  await expect(research).toContainText("La expansión puede retrasarse.");
+  await expect(portfolio.locator("form")).toHaveCount(0);
+  await expect(
+    portfolio
+      .getByRole("group", { name: "Vistas del portafolio" })
+      .getByRole("button"),
+  ).toHaveCount(3);
+  await noOverflow(page);
+});
+
 test("cartera real y propuesta se muestran separadas y datos desactualizados son explícitos", async ({
   page,
   isMobile,
@@ -287,12 +377,12 @@ test("archivo conserva la tesis de la captura y la fecha de registro", async ({
   await page.route("**/api/finance", (route) => route.fulfill({ json: data }));
   await page.goto("/");
   const portfolio = await openFinance(page, isMobile);
-  await expect(portfolio).toContainText(
-    "Los totales usan todos los movimientos",
-  );
   await portfolio
     .getByRole("button", { name: "Movimientos", exact: true })
     .click();
+  await expect(portfolio).toContainText(
+    "los totales usan todos los movimientos",
+  );
   await portfolio
     .getByText("Archivo de notas, tesis y decisiones anteriores", {
       exact: true,

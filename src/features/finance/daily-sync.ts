@@ -298,6 +298,20 @@ export function financeSyncFindings(
     })),
   ];
   const result: { id: string; message: string }[] = [];
+  if (
+    states.some(
+      (state) =>
+        state.id.startsWith("stock-") &&
+        (state.status === "error" ||
+          (state.status === "running" &&
+            now.getTime() - Date.parse(state.lastAttempt ?? "") > 15 * 60000)),
+    )
+  )
+    result.push({
+      id: "finance-stock-evidence",
+      message:
+        "Finanzas: parte de la investigación automática de empresas tiene fuentes pendientes. Se conserva la evidencia anterior; consulta la cobertura en la app.",
+    });
   const research = states.find((s) => s.id === "news-research");
   if (
     !research ||

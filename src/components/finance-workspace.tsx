@@ -398,10 +398,10 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
       ) : (
         <>
           <FinanceAutomationStatus automation={data.automation} demo={demo} />
-          {data.viewLimited ? (
+          {data.viewLimited && tab === "movements" ? (
             <p className="fi-hint">
-              Ves una muestra del archivo. Los totales usan todos los
-              movimientos; Exportar incluye el historial completo.
+              Esta vista resume el archivo reciente. Exportar incluye el
+              historial completo; los totales usan todos los movimientos.
             </p>
           ) : null}
           {tab === "portfolio" ? (

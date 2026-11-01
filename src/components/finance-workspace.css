@@ -1672,3 +1672,67 @@
   font-size: 11px;
   line-height: 1.8;
 }
+.fi-stock-card {
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--border, #e4e8df);
+}
+.fi-stock-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.fi-stock-heading h3 {
+  margin: 0.4rem 0 1rem;
+}
+.fi-stock-heading h3 small {
+  font: 500 0.8rem var(--font-sans, sans-serif);
+  color: #758173;
+  margin-left: 0.5rem;
+}
+.fi-stock-status {
+  color: #71836d;
+  font-size: 0.75rem;
+  text-align: right;
+}
+.fi-stock-link {
+  border-left: 2px solid #dce5d7;
+  padding-left: 1rem;
+  margin: 0.8rem 0 1.4rem;
+}
+.fi-stock-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.3rem 0;
+}
+.fi-stock-metrics dt,
+.fi-stock-metrics small {
+  color: #788274;
+  font-size: 0.75rem;
+}
+.fi-stock-metrics dd {
+  margin: 0.4rem 0;
+  font-size: 1.3rem;
+}
+.fi-stock-statistics {
+  background: #f7f9f4;
+  padding: 1rem 1.2rem;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+}
+.fi-stock-research a {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 620px) {
+  .fi-stock-heading {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .fi-stock-status {
+    text-align: left;
+  }
+  .fi-stock-metrics {
+    grid-template-columns: 1fr;
+  }
+}

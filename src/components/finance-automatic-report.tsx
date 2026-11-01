@@ -5,6 +5,7 @@ import type {
   AutomationWorkspace,
 } from "@/features/finance/automatic-types";
 import type { FinanceData } from "@/features/finance/types";
+import { FinanceStockResearch } from "./finance-stock-research";
 
 function money(value: string | undefined) {
   if (value === undefined || !Number.isFinite(Number(value)))
@@ -29,6 +30,13 @@ function date(value: string) {
         timeZone: "America/Mexico_City",
       }).format(parsed)
     : "Fecha pendiente";
+}
+function timestamp(value: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/Mexico_City",
+  }).format(new Date(value));
 }
 function Allocation({
   items,
@@ -111,7 +119,7 @@ export function FinanceAutomationStatus({
           <small>
             Informe del {date(report.asOf)} ·{" "}
             {automation?.lastSuccess
-              ? `Último cálculo ${date(automation.lastSuccess)}`
+              ? `Último cálculo ${timestamp(automation.lastSuccess)} CDMX`
               : `Motor ${report.engineVersion}`}
           </small>
         ) : null}
@@ -371,6 +379,40 @@ function ReportDetails({ report }: { report: AutomationReport }) {
           </div>
         </details>
       </section>
+      <FinanceStockResearch report={report.stockResearch} />
+      {report.actualRisk ? (
+        <details
+          className="fi-disclosure"
+          aria-label="Riesgo con pesos reales registrados"
+        >
+          <summary>
+            Tu exposición real frente al objetivo <ChevronRight size={14} />
+          </summary>
+          <p>
+            Desvío máximo frente al objetivo:{" "}
+            {fraction(report.actualRisk.maximumWeightDrift)}. Esto puede
+            requerir revisión aunque no haya aportación mensual.
+          </p>
+          <p>
+            Volatilidad hipotética con pesos actuales:{" "}
+            {fraction(report.actualRisk.risk.annualizedVolatility)}. Las
+            métricas siguientes usan tu distribución registrada; no son
+            rentabilidad realizada.
+          </p>
+          <div className="fi-auto-scenarios">
+            {report.actualRisk.scenarios.map((scenario) => (
+              <article key={scenario.label}>
+                <h3>{scenario.label}</h3>
+                <strong>{money(scenario.endValueMxn)}</strong>
+                <small>
+                  {scenario.returnPercent.toFixed(1)} % en este supuesto
+                </small>
+                <p>{scenario.assumption}</p>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
       <section
         className="fi-auto-risk"
         aria-label="Riesgo y escenarios condicionales"
@@ -449,11 +491,18 @@ function ReportDetails({ report }: { report: AutomationReport }) {
             ))}
           </details>
         ) : null}
-        <ul>
-          {[...report.risk.caveats, ...report.warnings].map((warning, i) => (
-            <li key={i}>{warning}</li>
-          ))}
-        </ul>
+        <details className="fi-disclosure">
+          <summary>
+            Supuestos y calidad de datos <ChevronRight size={14} />
+          </summary>
+          <ul>
+            {[...new Set([...report.risk.caveats, ...report.warnings])].map(
+              (warning, i) => (
+                <li key={i}>{warning}</li>
+              ),
+            )}
+          </ul>
+        </details>
       </section>
       <div className="fi-auto-review">
         <strong>Próxima revisión</strong>
@@ -472,6 +521,32 @@ function ReportDetails({ report }: { report: AutomationReport }) {
         <summary>
           Método, datos y alternativas <ChevronRight size={14} />
         </summary>
+        {report.evaluation ? (
+          <div className="fi-stock-statistics">
+            <h3>Comprobación temporal del riesgo</h3>
+            <p>
+              {report.evaluation.method}. {report.evaluation.attemptedFolds}{" "}
+              bloques intentados: {report.evaluation.folds} evaluados y{" "}
+              {report.evaluation.infeasibleFolds} sin combinación factible.
+            </p>
+            <p>
+              Volatilidad estimada media:{" "}
+              {fraction(report.evaluation.estimatedVolatility)} · observada
+              después: {fraction(report.evaluation.realizedVolatility)} · ancla
+              fija: {fraction(report.evaluation.baselineRealizedVolatility)}.
+            </p>
+            <p>
+              {report.evaluation.breaches} bloques superaron la estimación de
+              volatilidad.
+            </p>
+            <p className="fi-footnote">{report.evaluation.caveat}</p>
+          </div>
+        ) : (
+          <p className="fi-footnote">
+            Comprobación temporal de riesgo pendiente de al menos 117 retornos
+            comunes. No se afirma una ventaja predictiva.
+          </p>
+        )}
         <p className="fi-footnote">
           Informe {report.id} · Motor {report.engineVersion} ·{" "}
           {date(report.asOf)}

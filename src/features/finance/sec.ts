@@ -244,7 +244,8 @@ export async function collectCompanyFacts(
       warnings.push(
         "No hay conceptos us-gaap soportados; puede requerirse un reporte IFRS o extracción manual.",
       );
-    const facts: FinancialFact[] = [];
+    const facts: FinancialFact[] = [],
+      comparisonFacts: FinancialFact[] = [];
     const missing: string[] = [];
     for (const metric of METRICS) {
       const candidates: Candidate[] = [];
@@ -309,6 +310,26 @@ export async function collectCompanyFacts(
         const { priority: _priority, ...fact } = chosen;
         void _priority;
         facts.push({ ...fact, label: metric.label + period.suffix });
+        const previous = candidates
+          .filter((c) => {
+            const lag = (Date.parse(chosen.end) - Date.parse(c.end)) / 86400000;
+            return (
+              period.matches(c) &&
+              lag >= 350 &&
+              lag <= 380 &&
+              Math.abs(durationDays(c) - durationDays(chosen)) <= 7 &&
+              c.unit === chosen.unit
+            );
+          })
+          .sort(order)[0];
+        if (previous) {
+          const { priority: _p, ...prior } = previous;
+          void _p;
+          comparisonFacts.push({
+            ...prior,
+            label: metric.label + period.suffix,
+          });
+        }
         found = true;
       }
       if (!found) missing.push(metric.label);
@@ -326,12 +347,13 @@ export async function collectCompanyFacts(
     const bounded = facts.slice(0, 20);
     return {
       id: hash(
-        `sec-v1:${instrument.id}:${instrument.cik}:${JSON.stringify({ facts: bounded, warnings })}`,
+        `sec-v2:${instrument.id}:${instrument.cik}:${JSON.stringify({ facts: bounded, comparisonFacts, warnings })}`,
       ),
       instrumentId: instrument.id,
       capturedAt: now.toISOString(),
       source: "SEC EDGAR · XBRL us-gaap",
       facts: bounded,
+      comparisonFacts: comparisonFacts.slice(0, 20),
       warnings,
     };
   } catch (error) {

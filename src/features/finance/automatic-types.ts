@@ -1,4 +1,5 @@
 import type { FinanceNewsEvent } from "./research-types";
+import type { StockContext, StockResearchReport } from "./stock-types";
 
 export type AutomationProfile = {
   id: string;
@@ -55,6 +56,7 @@ export type AutomationReference = {
   sourceUrl: string;
 };
 export type AutomationInput = {
+  stockResearch?: StockContext;
   version: 1;
   engineVersion?: string;
   inputHash: string;
@@ -86,6 +88,26 @@ export type AutomaticAllocation = {
   sourceUrl: string;
 };
 export type AutomationReport = {
+  stockResearch?: StockResearchReport;
+  actualRisk?: {
+    weights: { symbol: string; weight: number }[];
+    maximumWeightDrift: number;
+    risk: AutomationReport["risk"];
+    scenarios: AutomationReport["scenarios"];
+  };
+  evaluation?: {
+    method: string;
+    folds: number;
+    attemptedFolds: number;
+    infeasibleFolds: number;
+    trainingWeeks: number;
+    testWeeks: number;
+    estimatedVolatility?: number;
+    realizedVolatility?: number;
+    baselineRealizedVolatility?: number;
+    breaches: number;
+    caveat: string;
+  };
   version: 1;
   id: string;
   inputHash: string;

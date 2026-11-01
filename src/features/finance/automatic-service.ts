@@ -40,6 +40,7 @@ import type {
 } from "./automatic-types";
 import type { FinanceMark, FinanceSyncState } from "./types";
 import type { FinanceNewsEvent } from "./research-types";
+import { prepareStockContext } from "./stock-service";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 type Reader = Pick<Db, "select">;
@@ -114,11 +115,13 @@ export function selectAutomationNews(
     .map((row) => row.event);
 }
 export type AutomationProviders = {
+  stocks?: typeof prepareStockContext;
   history: typeof fetchWeeklyHistory;
   reference: typeof fetchAutomationReference;
   fx: typeof fetchDailyFx;
 };
 const defaults: AutomationProviders = {
+  stocks: prepareStockContext,
   history: fetchWeeklyHistory,
   reference: fetchAutomationReference,
   fx: fetchDailyFx,
@@ -461,6 +464,11 @@ export async function prepareAutomationInput(
         }
       }
     }
+    const archivedNews = (await getFinanceNewsWorkspace(true, now)).events;
+    const researchNews = selectAutomationNews(archivedNews, now);
+    const stockResearch = providers.stocks
+      ? await providers.stocks(archivedNews, now)
+      : undefined;
     return await db.transaction(async (tx) => {
       await tx.execute(lock);
       current = await ledger(tx, now);
@@ -495,14 +503,13 @@ export async function prepareAutomationInput(
         warnings.push(
           "Tolerancia al riesgo sin confirmar: la distribución es provisional y requiere revisar pérdidas ilustrativas.",
         );
-      const archivedNews = (await getFinanceNewsWorkspace(true, now, tx))
-        .events;
-      const news = selectAutomationNews(archivedNews, now);
-      if (archivedNews.length)
+      const news = researchNews;
+      if (news.length)
         warnings.push(
           "Noticias del cálculo: muestra priorizada de hasta 32 eventos materiales de los últimos 30 días. El briefing y archivo conservan las noticias completas.",
         );
       const input: AutomationInput = {
+        ...(stockResearch ? { stockResearch } : {}),
         version: 1,
         engineVersion: modelConfig.version,
         inputHash: "",

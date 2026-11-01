@@ -16,6 +16,8 @@ import sys
 from urllib.parse import urlparse
 
 import numpy as np
+from finance_stocks import analyze_stocks
+from finance_diagnostics import temporal_risk_check
 from scipy.stats import scoreatpercentile
 from sklearn.covariance import LedoitWolf
 
@@ -412,9 +414,11 @@ def constrained_allocation(profile, dates, returns, as_of):
                f"volatilidad histórica anualizada máxima {limits['volMax']:.0%} y pérdida de choque máxima {limits['stressMax']:.0%}.")
     if profile["horizonYears"] < 5:
         summary += " El horizonte menor de cinco años endurece estos límites; no asegura recuperar pérdidas."
-    if len(returns) < 52 or not dates or (as_of.date() - dates[-1]).days > 14:
-        return anchor, "pending", [summary, "Verificación de límites pendiente: se conserva solo el ancla provisional de comparación hasta disponer de al menos 52 retornos semanales comunes y recientes." ]
-    covariance = LedoitWolf().fit(returns).covariance_ * 52
+    available = len(returns) >= 52 and bool(dates) and (as_of.date() - dates[-1]).days <= 14
+    # Structural and stress constraints do not require historical observations.
+    # Zero is only an internal sentinel; it is never reported as estimated risk.
+    covariance = LedoitWolf().fit(returns).covariance_ * 52 if available else np.zeros((2, 2))
+    pending = [] if available else ["Verificación de volatilidad pendiente: se aplican límites de horizonte, acciones, efectivo, USD y choques; la distribución es provisional sin cantidades ni compras hasta tener 52 retornos comunes recientes."]
 
     def diagnostics(candidate):
         vol = math.sqrt(max(0.0, float(candidate[:2] @ covariance @ candidate[:2])))
@@ -434,8 +438,8 @@ def constrained_allocation(profile, dates, returns, as_of):
 
     anchor_vol, anchor_loss, anchor_failures = diagnostics(anchor)
     if not anchor_failures:
-        return anchor, "feasible", [summary,
-            f"El ancla cumple los límites con esta muestra: volatilidad {anchor_vol:.1%} y pérdida de choque {anchor_loss:.1%}; se conservan sus pesos sin buscar mayor rentabilidad histórica."]
+        return anchor, "feasible" if available else "pending", [summary, *pending,
+            f"El ancla cumple los límites {'con esta muestra: volatilidad ' + format(anchor_vol, '.1%') if available else 'deterministas; volatilidad no disponible'} y pérdida de choque {anchor_loss:.1%}; se conservan sus pesos sin buscar mayor rentabilidad histórica."]
     feasible = []
     for equity_units in range(21):
         for treasury_units in range(21 - equity_units):
@@ -452,8 +456,8 @@ def constrained_allocation(profile, dates, returns, as_of):
     _, vol, _, _, weights, loss = selected
     anchor_label = "/".join(f"{w:.0%}" for w in anchor)
     selected_label = "/".join(f"{w:.0%}" for w in weights)
-    return weights, "feasible", [summary,
-        f"El ancla VT/SGOV/MXN {anchor_label} incumple {breach}; con covarianza y correlaciones Ledoit–Wolf se elige el punto factible más cercano {selected_label}: volatilidad {anchor_vol:.1%} → {vol:.1%}, pérdida de choque {anchor_loss:.1%} → {loss:.1%}. No se optimizan retornos esperados ni noticias."]
+    return weights, "feasible" if available else "pending", [summary, *pending,
+        f"El ancla VT/SGOV/MXN {anchor_label} incumple {breach}; se elige el punto más cercano {selected_label} bajo los límites {'con covarianza Ledoit–Wolf: volatilidad ' + format(anchor_vol, '.1%') + ' → ' + format(vol, '.1%') if available else 'deterministas; volatilidad pendiente'}; pérdida de choque {anchor_loss:.1%} → {loss:.1%}. No se optimizan retornos esperados ni noticias."]
 
 
 def stress_scenarios(weights, capital):
@@ -619,15 +623,15 @@ def generate_report(data):
     state, actual_weights, actual_value = actual_state(data, warnings)
     metadata = {asset["symbol"]: asset for asset in data["assets"]}
     catalog = [{**asset, **({"name": metadata[asset["symbol"]]["name"], "sourceUrl": metadata[asset["symbol"]]["sourceUrl"]} if asset["symbol"] in metadata else {})} for asset in CATALOG]
-    initial = allocation(capital, weights, profile["broker"], references if selection_state != "infeasible" else {}, catalog)
+    initial = allocation(capital, weights, profile["broker"], references if selection_state == "feasible" else {}, catalog)
     if selection_state == "infeasible":
         for item in initial["items"]:
             item["reason"] += " Solo comparación del ancla no viable: estos importes no proponen compras."
     contribution_weights = weights.copy()
     contribution_reason = "Aportación mensual orientativa a la distribución propuesta; todavía no hay posiciones reales."
-    if selection_state == "infeasible":
+    if selection_state in ("infeasible", "pending"):
         contribution_weights = np.array([0., 0., 1.])
-        contribution_reason = "No hay distribución factible bajo los límites exploratorios; mantener la aportación en efectivo MXN mientras se revisa el riesgo."
+        contribution_reason = "Distribución no validada bajo todos los límites exploratorios; mantener la aportación prevista en efectivo MXN mientras se revisan datos y riesgo."
     elif state == "known":
         # Direct new cash to underweight assets; never imply selling or a trade instruction.
         deficits = np.maximum(weights * (float(actual_value) + float(monthly)) - actual_weights * float(actual_value), 0)
@@ -637,7 +641,7 @@ def generate_report(data):
     elif state == "unknown":
         contribution_weights = np.array([0., 0., 1.])
         contribution_reason = "Mantener la aportación en efectivo MXN hasta conciliar las posiciones reales y sus valoraciones."
-    contribution = allocation(monthly, contribution_weights, profile["broker"], references if selection_state != "infeasible" else {}, catalog)
+    contribution = allocation(monthly, contribution_weights, profile["broker"], references if selection_state == "feasible" else {}, catalog)
     contribution["reason"] = contribution_reason
     contribution["reason"] += " Solo si entra ese dinero nuevo; no se confunde con efectivo existente ni con ganancia."
     risk = risk_metrics(dates, returns, weights)
@@ -660,9 +664,10 @@ def generate_report(data):
         warnings.append("Acceso, fracciones, comisión y diferencial cambiario del intermediario sin verificar; cantidades no disponibles.")
     elif "feePercent" not in profile["broker"] or "fxSpreadPercent" not in profile["broker"]:
         warnings.append("Costes incompletos: no se asume comisión ni diferencial cero y no se calculan cantidades.")
-    if selection_state == "infeasible":
+    drift = float(np.max(np.abs(actual_weights - weights))) if state == "known" and actual_value > 0 else 0.0
+    if selection_state in ("infeasible", "pending"):
         action = "wait"
-        reasons.append("Esperar: ningún candidato cumple simultáneamente las restricciones; no se presenta el ancla como una distribución aprobada o válida.")
+        reasons.append("Esperar: no se ha validado una combinación bajo todas las restricciones; no se presenta la comparación como una distribución aprobada ni se calculan cantidades de compra.")
     elif state == "unknown":
         action = "wait"
         reasons.append("Completar o conciliar datos de la cartera real antes de decidir compras o rebalanceos.")
@@ -672,9 +677,12 @@ def generate_report(data):
     elif state == "new":
         action = "prepare"
         reasons.append("Sin cartera real financiada: revisar la propuesta inicial y condiciones del intermediario; no se simula una compra ejecutada.")
-    elif monthly > 0 and np.max(np.abs(actual_weights - weights)) > .05:
+    elif actual_value == 0 and monthly > 0:
         action = "contribute"
-        reasons.append("Hay desvíos de más de cinco puntos porcentuales en la cartera real; la siguiente aportación puede reducirlos sin vender.")
+        reasons.append("La cuenta registrada tiene saldo cero: la propuesta depende solo del dinero nuevo previsto, sin restaurar el capital inicial ni inferir concentración.")
+    elif drift > .05 + 1e-12:
+        action = "contribute" if monthly > 0 else "review-risk"
+        reasons.append("Hay desvíos de más de cinco puntos porcentuales en la cartera real; revisar concentración y riesgo. Una aportación puede reducirlos, pero sin dinero nuevo también requieren revisión, sin ventas automáticas.")
     else:
         action = "maintain"
         reasons.append("Mantener la cartera real y revisar en la fecha prevista; un titular o movimiento diario no activa ventas automáticas.")
@@ -699,9 +707,9 @@ def generate_report(data):
     report = {
         "version": 1, "id": "auto-" + hashlib.sha256((ENGINE_VERSION + ":" + data["inputHash"]).encode()).hexdigest()[:24],
         "inputHash": data["inputHash"], "asOf": data["asOf"], "engineVersion": ENGINE_VERSION,
-        "status": "insufficient-data" if not enough or not fresh_history or state == "unknown" else ("review" if selection_state == "infeasible" else ("provisional" if unknown_risk else "review")),
+        "status": "insufficient-data" if not enough or not fresh_history or state == "unknown" else ("provisional" if unknown_risk else "review"),
         "headline": "Sin combinación factible: revisar el riesgo" if selection_state == "infeasible" else ("Propuesta provisional: confirma el riesgo" if unknown_risk else "Cartera y próxima aportación para revisar"),
-        "conclusion": "Esperar y revisar tolerancia, datos y límites: ninguna combinación cumple las restricciones exploratorias." if selection_state == "infeasible" else ("Revisar tolerancia a pérdidas antes de aprobar una distribución." if unknown_risk else ("Conciliar datos reales antes de operar." if state == "unknown" else "Conservar el plan y usar aportaciones para acercarse al objetivo, con revisión humana antes de ejecutar.")),
+        "conclusion": "Esperar y revisar datos y límites antes de proponer compras." if selection_state in ("infeasible", "pending") else ("Revisar tolerancia a pérdidas antes de aprobar una distribución." if unknown_risk else ("Conciliar datos reales antes de operar." if state == "unknown" else ("Revisar el desvío y la concentración de la cartera real antes de decidir cómo acercarse al objetivo." if drift > .05 + 1e-12 else "Conservar el plan y usar aportaciones para acercarse al objetivo, con revisión humana antes de ejecutar."))),
         "action": action, "reasons": reasons, "initial": initial, "contribution": contribution,
         "risk": risk, "scenarios": stress_scenarios(weights, actual_value if actual_value is not None else capital),
         "projections": projections, "alternatives": alternatives, "news": curated_news(data, as_of),
@@ -715,6 +723,19 @@ def generate_report(data):
                         "Noticias curadas como contexto condicional; no alteran pesos, covarianzas ni retornos esperados.",
                         "Importes brutos en MXN; costes solo si están verificados. Propuesta, valor real y aportaciones son conceptos distintos.",
                         "Bootstrap condicional por bloques, no probabilidad futura calibrada; choques de acciones/FX ilustrativos sin probabilidad."]}
+    if data.get("stockResearch") is not None:
+        report["stockResearch"] = analyze_stocks(data["stockResearch"], as_of)
+    evaluation = temporal_risk_check(profile, dates, returns, constrained_allocation, BASELINES[profile["riskPreference"]]) if enough and fresh_history else None
+    if evaluation:
+        report["evaluation"] = evaluation
+    if state == "known":
+        actual_risk = risk_metrics(dates, returns, actual_weights)
+        actual_risk["caveats"][0] = "Riesgo hipotético con los pesos actuales registrados, mantenidos constantes en la muestra; no es rendimiento realizado de tus operaciones."
+        actual_scenarios = stress_scenarios(actual_weights, actual_value)
+        for scenario in actual_scenarios:
+            scenario["assumption"] = scenario["assumption"].replace("pesos objetivo", "pesos actuales registrados")
+        report["actualRisk"] = {"weights": [{"symbol": s, "weight": float(w)} for s, w in zip(SYMBOLS, actual_weights)],
+                                "maximumWeightDrift": drift, "risk": actual_risk, "scenarios": actual_scenarios}
     # Fail closed if any numerical path overflows rather than output JSON NaN/Infinity.
     json.dumps(report, allow_nan=False)
     return report

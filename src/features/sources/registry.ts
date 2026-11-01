@@ -1,5 +1,26 @@
 export const feeds = [
   {
+    id: "cnbc-business",
+    name: "CNBC · Empresas",
+    url: "https://www.cnbc.com/id/10001147/device/rss/rss.html",
+    site: "https://www.cnbc.com/business/",
+    description: "Empresas, consumo, adquisiciones y cadenas de suministro.",
+    color: "#8c8f76",
+    initials: "CN",
+    category: "Negocios",
+  },
+  {
+    id: "cnbc-earnings",
+    name: "CNBC · Resultados",
+    url: "https://www.cnbc.com/id/15839135/device/rss/rss.html",
+    site: "https://www.cnbc.com/earnings/",
+    description:
+      "Resultados corporativos y perspectivas; cifras sujetas a contraste con documentos oficiales.",
+    color: "#7b9283",
+    initials: "CN",
+    category: "Finanzas",
+  },
+  {
     id: "cnbc-finance",
     name: "CNBC · Finanzas",
     url: "https://www.cnbc.com/id/10000664/device/rss/rss.html",

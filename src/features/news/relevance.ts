@@ -19,7 +19,9 @@ export function isRelevantStory(title: string, excerpt = "", sourceId = "") {
   )
     return false;
   return (
-    ["fed", "banking-dive"].includes(sourceId) ||
+    ["fed", "banking-dive", "cnbc-business", "cnbc-earnings"].includes(
+      sourceId,
+    ) ||
     isTechnologyStory(title, excerpt) ||
     financeAndOperations.test(`${title} ${excerpt.slice(0, 600)}`)
   );
