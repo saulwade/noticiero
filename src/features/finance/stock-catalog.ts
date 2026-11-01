@@ -137,7 +137,7 @@ export function findResearchIssuers(text: string) {
 }
 type Edge = StockLink & { toSymbol: string; trigger: RegExp };
 const infrastructure =
-  /\b(cloud|data cent(?:er|re)|tpu|gpu|capex|capital spending|capital expenditure|compute|infraestructura|centro(?:s)? de datos|chips?|semiconductor|capacity|capacidad)\b/i;
+  /\b(data cent(?:er|re)s?|tpu|capex|capital spending|capital expenditure|compute capacity|gpu infrastructure|ai factor(?:y|ies)|power capacity|liquid cooling|dsx|infraestructura|centro(?:s)? de datos|gasto de capital|capacidad de computo)\b/i;
 const coolingSource =
   "https://nvidianews.nvidia.com/news/european-ecosystem-builds-worlds-most-efficient-ai-factories-with-nvidia-dsx";
 export const stockEdges: Edge[] = [

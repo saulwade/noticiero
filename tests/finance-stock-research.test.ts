@@ -36,10 +36,42 @@ function event(
   return buildFinanceNewsEvent(story, now)!;
 }
 describe("investigación de emisores relacionados", () => {
+  it("una GPU de videojuegos no activa proveedores de centros de datos", () => {
+    const result = discoverStockCandidates(
+      [event("NVIDIA launches a gaming GPU for desktop PCs")],
+      now,
+    );
+    expect(result.map((c) => c.symbol)).toEqual(["NVDA"]);
+  });
+  it("una red densa de proveedores no desplaza una noticia reciente de consumo", () => {
+    const events = [
+      event("NVIDIA announces data center capex"),
+      event("Google announces TPU data center capacity"),
+      event("Microsoft announces GPU infrastructure expansion"),
+      event("Amazon announces data center capex"),
+      event("Crocs reports record revenue", undefined, "2026-11-01T11:00:00Z"),
+    ];
+    const result = discoverStockCandidates(events, now);
+    expect(result).toHaveLength(6);
+    expect(result.some((candidate) => candidate.symbol === "CROX")).toBe(true);
+    expect(
+      result.filter((candidate) => candidate.links.length > 0),
+    ).toHaveLength(3);
+  });
   it("reconoce ticker explícito y evita abreviaturas cortas ambiguas", () => {
-    expect(event("NASDAQ: ALAB reports earnings").companies.some((c) => c.symbol === "ALAB")).toBe(true);
-    expect(event("TT issues new guidance").companies.some((c) => c.symbol === "TT")).toBe(false);
-    expect(event("NYSE: TT reports revenue").companies.some((c) => c.symbol === "TT")).toBe(true);
+    expect(
+      event("NASDAQ: ALAB reports earnings").companies.some(
+        (c) => c.symbol === "ALAB",
+      ),
+    ).toBe(true);
+    expect(
+      event("TT issues new guidance").companies.some((c) => c.symbol === "TT"),
+    ).toBe(false);
+    expect(
+      event("NYSE: TT reports revenue").companies.some(
+        (c) => c.symbol === "TT",
+      ),
+    ).toBe(true);
   });
   it("descubre proveedor documentado sin confundirlo con mención directa", () => {
     const result = discoverStockCandidates(

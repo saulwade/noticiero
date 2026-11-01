@@ -1,6 +1,6 @@
 # Motor automático de propuestas financieras
 
-Versión `automatic-quant-1.2.0`, leída desde `src/features/finance/automatic-engine-version.json`, compartida con la preparación de entradas. Si la entrada declara `engineVersion`, debe coincidir con esta versión; los fixtures antiguos pueden omitirla. La preparación incluye la versión en la huella, por lo que un cambio de método produce otro informe sin reemplazar un resultado inmutable anterior. El proceso Python es determinista y sin red: recibe un `AutomationInput` por stdin y devuelve un `AutomationReport` por stdout. No recibe claves, conecta intermediarios, registra movimientos ni ejecuta compras. El servicio conserva las huellas del perfil, movimientos y referencias para invalidar informes anteriores cuando cambia la entrada.
+Versión `automatic-quant-1.2.1`, leída desde `src/features/finance/automatic-engine-version.json`, compartida con la preparación de entradas. Si la entrada declara `engineVersion`, debe coincidir con esta versión; los fixtures antiguos pueden omitirla. La preparación incluye la versión en la huella, por lo que un cambio de método produce otro informe sin reemplazar un resultado inmutable anterior. El proceso Python es determinista y sin red: recibe un `AutomationInput` por stdin y devuelve un `AutomationReport` por stdout. No recibe claves, conecta intermediarios, registra movimientos ni ejecuta compras. El servicio conserva las huellas del perfil, movimientos y referencias para invalidar informes anteriores cuando cambia la entrada.
 
 ## Universo y propuesta
 
@@ -86,7 +86,7 @@ Entorno Python 3.12 con `requirements-finance.txt`. Ejecución: `python scripts/
 Pruebas sintéticas públicas: `python -m unittest discover -s tests/python -p test_finance_quant.py`. Cubren datos ausentes, 52 retornos mínimos, huecos, precio ajustado más FX, cantidades y costes, conservación exacta de presupuesto, fechas futuras, no finitos, desconocimiento del intermediario, cartera desconocida o cero, aportaciones múltiples separadas de PnL, reproducibilidad, noticias condicionales, selección anclada bajo volatilidad/correlación distintas, horizonte corto, ausencia de solución factible y ausencia de operaciones.
 
 
-## Investigación automática de acciones · modelo 1.2.0
+## Investigación automática de acciones · modelo 1.2.1
 
 Una segunda capa examina hasta seis emisores en cada informe, separada de la distribución VT/SGOV/efectivo. El universo inicial de quince emisores incluye fabricantes, conectividad, infraestructura, energía, refrigeración y consumo, además de grandes tecnológicas. No es cobertura universal ni una clasificación de empresas por capitalización. Se priorizan relaciones documentadas y recencia, sin estimar que una empresa menos mencionada esté infravalorada.
 
@@ -105,3 +105,5 @@ Las restricciones de horizonte, acciones, efectivo, exposición USD y choques se
 La comprobación temporal comienza con 104 semanas y evalúa bloques siguientes de trece semanas sin solapamiento, seleccionando y estimando covarianza solo con observaciones anteriores al bloque. Informa ventanas intentadas, factibles y abstenciones, incluso cuando todas sean inviables. Compara volatilidad estimada con observada y con el ancla fija del perfil; las medias excluyen abstenciones y lo declaran. Es un diagnóstico retrospectivo con universo y parámetros actuales, sin costes ni retorno neto; no prueba ventaja predictiva, idoneidad de asignación, calibración de proyecciones ni eficacia prospectiva independiente.
 
 Se conserva todo en las 41 tablas existentes de archivo y respaldo. No se crean instrumentos, posiciones, decisiones humanas ni movimientos desde esta investigación. Las capturas iguales reutilizan la observación realmente persistida; una transacción fallida no deja evidencia nueva en el contexto. La interfaz mantiene tres pestañas y despliega la investigación solo al abrir «Más allá del titular».
+
+La selección reserva hasta tres lugares para relaciones documentadas y hasta tres para noticias directas, y completa huecos sin duplicar emisores. Esto evita que un grafo denso desplace indefinidamente noticias de otros sectores. Las reglas físicas no se activan por mencionar una GPU de videojuegos o un chip genérico; requieren contexto de centros de datos, inversión, capacidad de cómputo o infraestructura. La cuota agotada es espera explícita hasta el reinicio UTC, no una falsa avería de la fuente.

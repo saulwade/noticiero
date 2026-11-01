@@ -77,12 +77,21 @@ export function discoverStockCandidates(
       }
     }
   }
-  return [...map.values()]
-    .sort(
-      (a, b) =>
-        Number(b.links.length > 0) - Number(a.links.length > 0) ||
-        b.events[0].publishedAt.localeCompare(a.events[0].publishedAt) ||
-        a.symbol.localeCompare(b.symbol),
-    )
-    .slice(0, 6);
+  const ranked = [...map.values()].sort(
+    (a, b) =>
+      Number(b.links.length > 0) - Number(a.links.length > 0) ||
+      b.events[0].publishedAt.localeCompare(a.events[0].publishedAt) ||
+      a.symbol.localeCompare(b.symbol),
+  );
+  // Reserve room for direct recent news as well as documented indirect paths.
+  // A dense static supplier graph must not suppress an unrelated earnings event.
+  const selected = [
+    ...ranked.filter((c) => c.links.length > 0).slice(0, 3),
+    ...ranked.filter((c) => c.links.length === 0).slice(0, 3),
+  ];
+  const seen = new Set(selected.map((c) => c.symbol));
+  return [...selected, ...ranked.filter((c) => !seen.has(c.symbol))].slice(
+    0,
+    6,
+  );
 }
