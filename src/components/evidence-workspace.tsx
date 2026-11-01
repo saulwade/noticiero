@@ -48,7 +48,8 @@ const sourceNames: Record<string, string> = {
   hn: "Hacker News",
   github: "GitHub público",
   cfpb: "CFPB · Estados Unidos",
-  profeco: "PROFECO · importación CSV",
+  profeco: "PROFECO · México",
+  "sfc-co": "Superfinanciera · Colombia",
 };
 const fieldLabels: Record<keyof ProblemDossier["fields"], string> = {
   segment: "Quién tiene el problema",

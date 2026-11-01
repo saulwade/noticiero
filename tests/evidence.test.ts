@@ -143,11 +143,15 @@ describe("evidencia contextual y persistencia", () => {
         countryBasis: "CFPB jurisdiction",
       }),
     ];
-    const d = buildDossiers(rs, [], now)[0];
+    const groups = buildDossiers(rs, [], now);
+    const d = groups.find((d) => !d.countries.length)!;
     expect(d.identifiedAuthors).toBe(2);
-    expect(d.anonymousCases).toBe(1);
-    expect(d.evidenceIds).toHaveLength(3);
+    expect(d.anonymousCases).toBe(0);
+    expect(d.evidenceIds).toHaveLength(2);
     expect(d.countries).not.toContain("MX");
+    expect(groups.find((d) => d.countries.includes("US"))?.anonymousCases).toBe(
+      1,
+    );
   });
   it("mantiene segmentos/productos separados y guarda soluciones como contradicción", () => {
     const rs = [

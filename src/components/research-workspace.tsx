@@ -12,6 +12,7 @@ import {
 import type { DashboardData, ResearchSignal, SavedItem } from "@/lib/types";
 import { editionFor } from "@/lib/time";
 import { ResearchArchive } from "./research-archive";
+import { OpportunityResearchDigest } from "./opportunity-research-digest";
 
 export function ResearchWorkspace({
   data,
@@ -113,6 +114,7 @@ export function ResearchWorkspace({
       </div>
       {tab === "ideas" ? (
         <>
+          <OpportunityResearchDigest data={data.evidence} />
           {children}
           {!data.opportunities.length ? (
             <button className="notebook-invite" onClick={() => setTab("notes")}>
@@ -131,10 +133,11 @@ export function ResearchWorkspace({
       ) : tab === "notes" ? (
         <div className="research-notes">
           <p className="research-explanation">
-            Las observaciones se agrupan por similitud de términos y se
-            conservan entre días. Una cuenta pública no es un cliente
-            verificado. Puedes guardar tus propias preguntas y siguientes pasos
-            en cada nota.
+            Las observaciones se agrupan por tarea, producto y segmento
+            explícito y se conservan entre días. Las citas de otras personas no
+            cuentan como experiencias propias. Una cuenta pública no es un
+            cliente verificado. Puedes guardar tus propias preguntas y
+            siguientes pasos en cada nota.
           </p>
           {notes.length ? (
             notes.map((note) => (

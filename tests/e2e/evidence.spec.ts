@@ -19,6 +19,9 @@ test("radar vacío, filtros, cobertura y exportación en escritorio y teléfono"
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/?demo=1");
   await openRadar(page, isMobile);
+  await expect(
+    page.getByRole("region", { name: "Prioridades de investigación" }),
+  ).toContainText("Qué vale la pena entender.");
   const radar = page.getByRole("region", { name: "Radar de evidencia" });
   await expect(radar.getByRole("heading", { level: 1 })).toContainText(
     "Problemas reales.",
@@ -120,6 +123,11 @@ test("CSV explícito y revisión persistente dentro de Oportunidades", async ({
   await expect(radar.getByRole("status")).toContainText(
     /2 registros nuevos importados/,
   );
+  const priorities = page.getByRole("region", {
+    name: "Prioridades de investigación",
+  });
+  await expect(priorities).toContainText("México:");
+  await expect(priorities).toContainText("Repetición histórica");
   expect(writes).toHaveLength(1);
   expect(JSON.parse(writes[0]).action).toBe("import");
 

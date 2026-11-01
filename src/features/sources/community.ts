@@ -2,6 +2,7 @@ import { z } from "zod";
 import { fetchExternal, mapConcurrent } from "@/lib/http";
 import { makeStory } from "@/features/news/normalize";
 import type { Story } from "@/lib/types";
+import { authoredHtml } from "@/features/research/evidence-text";
 
 const host = "hacker-news.firebaseio.com";
 const itemSchema = z.object({
@@ -68,6 +69,7 @@ export async function loadCommunity(section: "ask" | "show"): Promise<Story[]> {
         ...story,
         kind: section === "ask" ? "question" : "launch",
         author: thread.by,
+        authoredExcerpt: authoredHtml(thread.text ?? "").slice(0, 4000),
         threadId: String(thread.id),
         category: "Startups",
       });
@@ -101,6 +103,7 @@ export async function loadCommunity(section: "ask" | "show"): Promise<Story[]> {
         ...story,
         kind: "comment",
         author: comment.by,
+        authoredExcerpt: authoredHtml(comment.text).slice(0, 4000),
         threadId: String(parent.id),
         category: "Startups",
       });

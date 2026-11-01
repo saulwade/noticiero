@@ -21,6 +21,8 @@ export type Story = {
   publishedAt: string;
   detectedAt: string;
   excerpt: string;
+  /** Community author's own text, retaining paragraph/quote boundaries for research. */
+  authoredExcerpt?: string;
   summary?: string;
   summaryMethod?: "extractive";
   summaryLanguage?: "es" | "en" | "unknown";
@@ -95,6 +97,7 @@ export type ResearchSignal = {
   terms: string[];
   occurredAt: string;
   detectedAt: string;
+  contentHash?: string;
 };
 export type ResearchNote = {
   id: string;
@@ -106,6 +109,7 @@ export type ResearchNote = {
   independentVoices: number;
   status: "isolated" | "repeated";
   journal: { date: string; added: number; totalVoices: number }[];
+  scope?: import("@/features/research/problem-scope").ProblemScope;
 };
 export type ResearchModel = {
   version: number;
@@ -163,6 +167,7 @@ export type OpportunityEvent = {
   kind: "discovered" | "updated";
   at: string;
   idea: Opportunity;
+  currentAssessment?: "supported" | "superseded";
 };
 export type ValidationProject = {
   id: string;

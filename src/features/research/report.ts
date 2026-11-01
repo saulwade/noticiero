@@ -126,7 +126,7 @@ export function createDailyReport(
     `- ${documents.length} documentos incorporados en la jornada.`,
     `- ${todaySignals.length} señales nuevas de solicitudes, fricción o soluciones manuales.`,
     `- ${activeNotes.length} notas con observaciones nuevas.`,
-    `- Motor: TF-IDF, similitud coseno y reglas explícitas; sin API de IA.`,
+    `- Motor: TF-IDF para palabras clave y reglas explícitas de atribución, tarea, producto y segmento para agrupar; sin API de IA.`,
     "",
   ];
   lines.push(

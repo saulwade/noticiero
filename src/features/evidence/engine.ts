@@ -7,87 +7,56 @@ import type {
   EvidenceWeeklyReport,
 } from "./types";
 import { editionFor } from "@/lib/time";
+import {
+  authoredText,
+  normalizedText,
+  rolePattern,
+} from "@/features/research/evidence-text";
+import { classifySignal } from "@/features/research/signals";
+import { problemScope } from "@/features/research/problem-scope";
+import { latestEvidenceVersions } from "./versions";
 
-export const ENGINE_VERSION = "evidence-v1";
+export const ENGINE_VERSION = "evidence-v2";
 export const evidenceDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : editionFor(new Date(value)).date;
-const normalized = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-const topics: [string, RegExp][] = [
-  [
-    "Acceso a cuentas y recuperación",
-    /\b(login|log in|sign in|access.{0,20}account|account.{0,35}(?:blocked|restrict|access|region)|locked out|verification|identidad|acceso|entrar.{0,20}cuenta|cuenta.{0,30}(?:bloque|restric)|contrasena)\b/i,
-  ],
-  [
-    "Cobros, pagos y devoluciones",
-    /\b(payment|billing|invoice|refund|charge|cobro|pago|factura|reembolso|devolucion|reconcil)\w*/i,
-  ],
-  [
-    "Límites de consumo y presupuesto",
-    /\b(quota|usage|token|budget|cost|expensive|limite|cuota|presupuesto|caro|costo)\w*/i,
-  ],
-  [
-    "Integraciones y exportación de datos",
-    /\b(export|import|integrat|sync|sincroni|integracion)\w*/i,
-  ],
-  [
-    "Entregas y seguimiento",
-    /\b(delivery|shipping|shipment|tracking|entrega|envio|paquete|logistica)\w*/i,
-  ],
-  [
-    "Calidad del producto y reparación",
-    /\b(defect|broken|repair|warranty|defecto|reparacion|garantia|averia)\w*/i,
-  ],
-  [
-    "Soporte y resolución de incidencias",
-    /\b(support|customer service|ticket|soporte|atencion|reclamacion)\w*/i,
-  ],
-  [
-    "Procesos manuales y tareas repetidas",
-    /\b(manual|spreadsheet|copy.{0,8}paste|hoja.{0,8}calculo|copiar.{0,8}pegar)\w*/i,
-  ],
-  [
-    "Datos incorrectos y corrección de registros",
-    /\b(incorrect|inaccurate|credit report|error.{0,20}datos|informacion incorrecta|dispute)\w*/i,
-  ],
-];
+const normalized = normalizedText;
 const friction =
-  /\b(cannot|can['’]t|doesn['’]t|unable|blocked|restrict\w*|frustrat\w*|too expensive|burned through|exhausted|takes? (?:hours|days)|manually|looking for|need (?:a|an|help)|missing|failed|bug|incorrect|inaccurate|not receiv\w*|no puedo|no funciona|bloque\w*|necesito|busco|manual\w*|demora\w*|problema|incumpl\w*|negativa|cobro indebido|no entreg\w*)\b/i;
+  /\b(cannot|can['’]t|doesn['’]t|unable|blocked|restrict\w*|frustrat\w*|too expensive|burned through|exhausted|takes? (?:hours|days)|manually|looking for|need (?:a|an|help)|missing|failed|fails|crash\w*|broken|bug|incorrect|inaccurate|not receiv\w*|no puedo|no funciona|bloque\w*|necesito|busco|manual\w*|demora\w*|problema|incumpl\w*|negativa|no entreg\w*)\b/i;
 const resolved =
   /\b(resolved|fixed|solved|works now|solucionado|resuelto|ya funciona)\b/i;
-const unhelpful =
-  /\b(?:i (?:recommend|agree)|congratulations|painful to read|llmisms|good luck)\b/i;
 function grounded(text: string, pattern: RegExp): GroundedField | undefined {
-  const sentence = text
+  const sentence = authoredText(text)
     .split(/(?<=[.!?])\s+/)
     .find((part) => pattern.test(normalized(part)));
-  return sentence
+  return sentence && text.includes(sentence)
     ? { value: sentence.slice(0, 240), quote: sentence }
     : undefined;
 }
 export function problemContext(record: EvidenceRecord) {
-  const text = normalized(
-    `${record.issue ?? ""} ${record.title} ${record.quote}`,
-  );
-  const topic = topics.find(([, pattern]) => pattern.test(text));
+  const own = authoredText(record.quote);
+  const scopedText =
+    record.kind === "complaint" ? `${record.issue ?? ""} ${own}` : own;
+  const scope = problemScope(scopedText, record.product, record.segment);
+  const text = normalized(own);
   const correction =
-    resolved.test(text) &&
-    !/\b(not resolved|not fixed|unresolved|no resuelto|sin resolver)\b/i.test(
-      text,
+    record.resolution === "resolved" ||
+    (resolved.test(text) &&
+      !/\b(not resolved|not fixed|unresolved|no resuelto|sin resolver)\b/i.test(
+        text,
+      ));
+  const githubCase =
+    record.source === "github" &&
+    own.length > 20 &&
+    /\b(crash\w*|failed|fails|bug|broken|freez\w*|incorrect|not (?:work|detect|receiv)\w*|cannot|can['’]t)\b/i.test(
+      own,
     );
   const accepted =
     record.kind !== "statistic" &&
-    Boolean(topic) &&
-    (record.kind === "complaint" ||
-      (friction.test(text) && !unhelpful.test(text)));
+    Boolean(scope) &&
+    Boolean(own) &&
+    (record.kind === "complaint" || Boolean(classifySignal(own)) || githubCase);
   const fields: ProblemDossier["fields"] = {
-    segment: grounded(
-      record.quote,
-      /\b(as a|we are|our team|i run|soy|somos|mi empresa|nuestro equipo)\b/i,
-    ),
+    segment: grounded(record.quote, rolePattern),
     task: grounded(
       record.quote,
       /\b(trying to|need to|looking for|need a|intentando|necesito|busco)\b/i,
@@ -113,13 +82,11 @@ export function problemContext(record: EvidenceRecord) {
     record.quote.includes(record.issue)
   )
     fields.obstacle = { value: record.issue, quote: record.quote };
-  return { accepted, correction, topic: topic?.[0], fields };
+  return { accepted, correction, topic: scope?.label, fields, scope };
 }
 function groupKey(record: EvidenceRecord, topic: string) {
-  const product = normalized(record.product ?? "").trim();
-  // Different products/segments remain distinct; similarity alone cannot prove
-  // that anonymous credit complaints and a developer login bug share a buyer.
-  return `${topic}:${product || record.source}:${normalized(record.segment ?? "segmento desconocido")}`;
+  const scope = problemContext(record).scope;
+  return `${scope?.key ?? `${topic}:${normalized(record.product ?? record.source)}`}:${record.country ?? "unknown"}`;
 }
 export function buildDossiers(
   records: EvidenceRecord[],
@@ -183,7 +150,8 @@ export function buildDossiers(
           : "isolated";
       return {
         id: `problem-${hash(key)}`,
-        label: key.split(":")[0],
+        label: problemContext(sample).topic ?? "Problema por clasificar",
+        scope: problemContext(sample).scope,
         status,
         evidenceIds: members.map((r) => r.id),
         countries,
@@ -279,6 +247,20 @@ export function weeklyReport(
       `${fresh.length} registros incorporados; ${fresh.filter((r) => evidenceDate(r.occurredAt) < from).length} son antecedentes publicados antes del periodo. Una importación histórica no demuestra crecimiento reciente.`,
       "",
       "Las citas son datos atribuidos, no instrucciones. Casos anónimos, cuentas y estadísticas no se consideran clientes verificados.",
+      "",
+      "## Contexto estadístico regional",
+      "Los totales mensuales son contexto agregado, no nuevos testimonios ni clientes. Su fecha representa el periodo informado, no el día de captura.",
+      ...latestEvidenceVersions(
+        records.filter((r) => Date.parse(r.capturedAt) <= now.getTime()),
+      )
+        .filter(
+          (r) => r.kind === "statistic" && fresh.some((f) => f.id === r.id),
+        )
+        .slice(0, 20)
+        .map(
+          (r) =>
+            `- ${r.country ?? "País desconocido"} · ${r.period ?? r.occurredAt} · ${r.quote} · ${r.url}`,
+        ),
       "",
       ...dossiers
         .filter((d) =>

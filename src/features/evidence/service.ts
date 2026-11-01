@@ -11,8 +11,10 @@ import {
 import { hash, safePublicUrl } from "@/features/news/normalize";
 import { buildDossiers, weeklyReport } from "./engine";
 import { collectCfpb, collectGithub } from "./connectors";
+import { collectColombia, collectProfeco } from "./regional-connectors";
 import { parseProfecoCsv } from "./profeco";
 import { editionFor } from "@/lib/time";
+import { evidenceCoverage, researchShortlist } from "./shortlist";
 import type { Story, ValidationProject } from "@/lib/types";
 import type {
   EvidenceData,
@@ -23,18 +25,19 @@ import type {
 
 export const MAX_EVIDENCE_RECORDS = 10000;
 const MAX_EVIDENCE_BYTES = 16_000_000;
-const defaults: ConnectorState[] = ["hn", "github", "cfpb", "profeco"].map(
-  (id) => ({
-    id: id as ConnectorState["id"],
-    status: "waiting",
-    count: 0,
-    checkedAt: "",
-    message:
-      id === "profeco"
-        ? "Importa un CSV oficial. No se presume acceso automático al portal."
-        : "Pendiente de la próxima actualización.",
-  }),
-);
+const defaults: ConnectorState[] = [
+  "hn",
+  "github",
+  "cfpb",
+  "profeco",
+  "sfc-co",
+].map((id) => ({
+  id: id as ConnectorState["id"],
+  status: "waiting",
+  count: 0,
+  checkedAt: "",
+  message: "Pendiente de la próxima actualización automática.",
+}));
 export async function getEvidenceData(
   now = new Date(),
   full = false,
@@ -101,6 +104,8 @@ export async function getEvidenceData(
             },
       ),
     totalRecords: all.length,
+    shortlist: researchShortlist(dossiers, all, now),
+    coverage: evidenceCoverage(all),
     storageLimited:
       all.length >= MAX_EVIDENCE_RECORDS ||
       Buffer.byteLength(JSON.stringify(all)) >= MAX_EVIDENCE_BYTES,
@@ -243,7 +248,10 @@ export async function refreshEvidence(
       sourceName: s.sourceName,
       url: s.url,
       title: s.originalTitle ?? s.title,
-      quote: s.excerpt.slice(0, 4000),
+      quote: (s.kind === "question"
+        ? `${s.originalTitle ?? s.title}. ${s.authoredExcerpt ?? s.excerpt}`
+        : (s.authoredExcerpt ?? s.excerpt)
+      ).slice(0, 4000),
       occurredAt: s.publishedAt,
       capturedAt: s.detectedAt,
       language: /\b(necesito|busco|cuenta|factura|nuestro)\b/i.test(s.excerpt)
@@ -251,11 +259,11 @@ export async function refreshEvidence(
         : "en",
       kind: "community",
       authorKey: s.author ? `hn:${s.author.toLowerCase()}` : undefined,
-      product: /\b(anthropic|claude)\b/i.test(s.excerpt)
+      product: /\b(anthropic|claude)\b/i.test(s.authoredExcerpt ?? s.excerpt)
         ? "Anthropic / Claude"
-        : /\bapple developer\b/i.test(s.excerpt)
+        : /\bapple developer\b/i.test(s.authoredExcerpt ?? s.excerpt)
           ? "Apple Developer"
-          : /\blinkedin\b/i.test(s.excerpt)
+          : /\blinkedin\b/i.test(s.authoredExcerpt ?? s.excerpt)
             ? "LinkedIn"
             : undefined,
     }));
@@ -268,8 +276,12 @@ export async function refreshEvidence(
     message:
       "Muestra de preguntas y comentarios ya recopilados; no representa todo Hacker News.",
   });
-  for (const collect of [collectCfpb, collectGithub]) {
-    const id = collect === collectCfpb ? "cfpb" : "github";
+  for (const [id, collect] of [
+    ["cfpb", collectCfpb],
+    ["github", collectGithub],
+    ["profeco", collectProfeco],
+    ["sfc-co", collectColombia],
+  ] as const) {
     const previous = old.sources.find((s) => s.id === id);
     // Public APIs are called at most every six hours, including after failures.
     if (

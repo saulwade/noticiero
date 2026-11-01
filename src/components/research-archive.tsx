@@ -36,7 +36,8 @@ export function ResearchArchive({
       <p className="research-explanation">
         Este archivo se llena solo al actualizar las noticias. Conserva
         oportunidades nuevas y revisiones con su evidencia, aunque no las hayas
-        leído ni marcado como favoritas.
+        leído ni marcado como favoritas. Las capturas históricas se conservan;
+        una hipótesis puede quedar superada al mejorar los criterios actuales.
       </p>
       <div className="archive-tools">
         <label>
@@ -105,6 +106,12 @@ export function ResearchArchive({
       {events.length ? (
         events.map((event) => (
           <article className="archive-event" key={event.id}>
+            {event.currentAssessment === "superseded" ? (
+              <p className="research-explanation">
+                Hipótesis histórica superada por los filtros actuales; no es una
+                oportunidad activa.
+              </p>
+            ) : null}
             <div className="detail-topline">
               <span className="eyebrow">
                 {event.kind === "discovered"

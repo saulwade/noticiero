@@ -33,25 +33,43 @@ export function proposeLocalOpportunities(
       let proposal = `Hipótesis: reducir un paso repetido relacionado con ${note.label.toLowerCase()}, empezando por el problema descrito en las citas.`;
       let mvp =
         "Un prototipo que resuelva un solo caso de las citas. Probarlo manualmente con un usuario antes de automatizar todo.";
-      if (note.label.includes("Costos")) {
+      if (
+        note.scope?.task === "budget-control" ||
+        note.label.includes("Costos")
+      ) {
         proposal =
           "Un panel por proyecto que consolide consumo de modelos y alerte antes de agotar presupuestos.";
         mvp =
           "Importar un archivo de consumo, agrupar costos por proyecto y generar una alerta de umbral. Validar con dos usuarios antes de conectar proveedores.";
       }
-      if (note.label.includes("Facturación")) {
+      if (
+        note.scope?.task === "invoice-reconcile" ||
+        note.label.includes("Facturación")
+      ) {
         proposal =
           "Una herramienta que convierta documentos de facturación de formatos repetidos en registros conciliables y revisables.";
         mvp =
           "Procesar dos formatos aportados voluntariamente por usuarios, marcar discrepancias y exportar una tabla, manteniendo revisión humana.";
       }
-      if (note.label.includes("Integraciones")) {
+      if (
+        note.scope?.task === "data-integration" ||
+        note.label.includes("Integraciones")
+      ) {
         proposal =
           "Un conector pequeño para el traspaso de información que las personas describen hacer a mano.";
         mvp =
           "Conectar únicamente las dos herramientas mencionadas por los participantes y resolver un flujo con registro de errores.";
       }
-      if (note.label.includes("reuniones")) {
+      if (note.scope?.task === "data-export") {
+        proposal =
+          "Una exportación revisable de un tipo de registro que las personas dicen no poder obtener de su herramienta actual.";
+        mvp =
+          "Comprobar permisos y formato con dos usuarios; exportar un solo tipo de registro de una herramienta citada y revisar los campos antes de ampliar.";
+      }
+      if (
+        note.scope?.task === "meeting-followup" ||
+        note.label.includes("reuniones")
+      ) {
         proposal =
           "Convertir transcripciones en tareas revisables y seguimiento dentro de una herramienta existente.";
         mvp =

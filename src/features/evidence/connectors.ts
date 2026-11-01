@@ -75,6 +75,7 @@ const githubItem = z.object({
   updated_at: date,
   user: z.object({ login: z.string().min(1), type: z.string() }).nullable(),
   pull_request: z.unknown().optional(),
+  state: z.enum(["open", "closed"]).optional(),
 });
 const githubSchema = z.object({
   total_count: z.number().nonnegative(),
@@ -104,7 +105,7 @@ class Limited extends Error {
     super("Límite temporal de la API pública");
   }
 }
-function cooldown(
+export function cooldown(
   source: EvidenceSource,
   previous: ConnectorState | undefined,
   now: Date,
@@ -124,7 +125,7 @@ function cooldown(
       },
     };
 }
-function failure(
+export function failure(
   source: EvidenceSource,
   previous: ConnectorState | undefined,
   now: Date,
@@ -151,7 +152,7 @@ function failure(
     },
   };
 }
-async function publicJson(
+export async function publicJson(
   url: URL,
   now: Date,
   fetcher: Fetcher,
@@ -389,6 +390,7 @@ export async function collectGithub(
         kind: "community",
         authorKey: `github:${item.user.login.toLowerCase()}`,
         product: repository,
+        caseStatus: item.state,
       });
     }
     return {

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   researchModels,
@@ -9,6 +9,7 @@ import {
   dailyReports,
   opportunityEvents,
   researchObservations,
+  stories as storedStories,
 } from "@/db/schema";
 import { getStories } from "@/db/repository";
 import type { ResearchData } from "@/lib/types";
@@ -20,10 +21,11 @@ import { createDailyReport, localHour } from "./report";
 import { editionFor } from "@/lib/time";
 import { hash } from "@/features/news/normalize";
 import { recordOpportunity } from "./archive";
+import { authoredText } from "./evidence-text";
 
 export async function getResearchData(): Promise<ResearchData> {
   const db = await getDb();
-  const [models, notes, signals, reports, history, observations] =
+  const [models, notes, signals, reports, history, observations, community] =
     await Promise.all([
       db.select().from(researchModels).where(eq(researchModels.id, "local-v1")),
       db.select().from(researchNotes),
@@ -31,50 +33,43 @@ export async function getResearchData(): Promise<ResearchData> {
       db.select().from(dailyReports),
       db.select().from(opportunityEvents),
       db.select().from(researchObservations),
+      db
+        .select({
+          id: storedStories.id,
+          excerpt: sql<string>`${storedStories.data}->>'excerpt'`,
+          authoredExcerpt: sql<
+            string | null
+          >`${storedStories.data}->>'authoredExcerpt'`,
+          contentHash: sql<string>`${storedStories.data}->>'contentHash'`,
+        })
+        .from(storedStories)
+        .where(sql`${storedStories.data}->>'kind' IN ('question','comment')`),
     ]);
   // Revalidate cached evidence when the explicit classifier improves; retain raw rows for audit.
+  const sources = new Map(community.map((s) => [s.id, s]));
+  const comparableText = (value: string) => value.replace(/\s+/g, " ").trim();
   const accepted = signals.flatMap((row) => {
-    const kind = classifySignal(row.data.quote);
-    return kind ? [{ ...row.data, kind }] : [];
+    const quote = authoredText(row.data.quote);
+    const source = sources.get(row.data.storyId);
+    // A newly retained paragraph boundary can prove that a legacy flattened
+    // quotation was somebody else's text. An actual later content edit does
+    // not erase a previously captured, versioned first-person statement.
+    if (
+      source?.authoredExcerpt !== null &&
+      source?.authoredExcerpt !== undefined &&
+      (!row.data.contentHash || row.data.contentHash === source.contentHash) &&
+      comparableText(source.excerpt).includes(comparableText(row.data.quote)) &&
+      !comparableText(source.authoredExcerpt).includes(comparableText(quote))
+    )
+      return [];
+    const kind = classifySignal(quote);
+    return kind ? [{ ...row.data, kind, quote, terms: terms(quote) }] : [];
   });
-  const acceptedIds = new Set(accepted.map((signal) => signal.id));
-  const currentNotes = notes
-    .map((row) => {
-      const note = row.data;
-      const members = accepted.filter((signal) =>
-        note.signalIds.includes(signal.id),
-      );
-      const voices = new Set(
-        members
-          .filter((signal) => signal.author)
-          .map((signal) => signal.independenceKey),
-      ).size;
-      return {
-        ...note,
-        signalIds: note.signalIds.filter((id) => acceptedIds.has(id)),
-        independentVoices: voices,
-        status: voices >= 2 ? ("repeated" as const) : ("isolated" as const),
-        journal: note.journal
-          .map((entry) => ({
-            ...entry,
-            added: members.filter(
-              (signal) =>
-                editionFor(new Date(signal.detectedAt)).date === entry.date,
-            ).length,
-            totalVoices: new Set(
-              members
-                .filter(
-                  (signal) =>
-                    signal.author &&
-                    editionFor(new Date(signal.detectedAt)).date <= entry.date,
-                )
-                .map((signal) => signal.independenceKey),
-            ).size,
-          }))
-          .filter((entry) => entry.added > 0),
-      };
-    })
-    .filter((note) => note.signalIds.length > 0);
+  const currentNotes = clusterSignals(
+    notes.map((r) => r.data),
+    accepted,
+    models[0]?.data ?? trainModel(undefined, []),
+  );
   return {
     observations: observations
       .map((row) => row.data)
@@ -82,7 +77,24 @@ export async function getResearchData(): Promise<ResearchData> {
     notes: currentNotes.sort((a, b) => b.lastSeen.localeCompare(a.lastSeen)),
     signals: accepted,
     history: history
-      .map((row) => row.data)
+      .map((row) => ({
+        ...row.data,
+        currentAssessment:
+          row.data.idea.engine !== "local"
+            ? undefined
+            : currentNotes.some(
+                  (n) =>
+                    n.id === row.data.idea.researchNoteId &&
+                    n.status === "repeated",
+                ) &&
+                row.data.idea.evidence.every((e) =>
+                  accepted.some(
+                    (s) => s.storyId === e.storyId && s.quote === e.quote,
+                  ),
+                )
+              ? ("supported" as const)
+              : ("superseded" as const),
+      }))
       .sort((a, b) => b.at.localeCompare(a.at)),
     reports: reports
       .map((row) => row.data)

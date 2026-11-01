@@ -1,0 +1,113 @@
+.op-research-digest {
+  margin: 2rem 0 3rem;
+  color: var(--text-primary, #354638);
+}
+.op-research-digest header {
+  max-width: 46rem;
+  margin-bottom: 1.5rem;
+}
+.op-research-digest h2 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1.65rem, 2.3vw, 2.1rem);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0.65rem 0;
+}
+.op-research-digest header p,
+.op-regional-coverage,
+.op-lead-context,
+.op-lead-counts,
+.op-lead-empty {
+  color: var(--text-secondary, #6d796b);
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+.op-regional-coverage {
+  padding: 0.8rem 0;
+  border-block: 1px solid var(--border, #e4e8df);
+  overflow-wrap: anywhere;
+}
+.op-lead {
+  padding: 1.6rem 0;
+  border-bottom: 1px solid var(--border, #e4e8df);
+  min-width: 0;
+}
+.op-lead-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+.op-lead h3 {
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin: 0;
+}
+.op-lead-heading > span {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #6d796b);
+  white-space: nowrap;
+}
+.op-lead > p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  max-width: 70rem;
+}
+.op-lead details {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+.op-lead summary {
+  cursor: pointer;
+  color: var(--text-secondary, #6d796b);
+  padding: 0.5rem 0;
+  width: fit-content;
+}
+.op-lead-detail {
+  padding: 1rem 0;
+  max-width: 62rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.op-lead-detail ul {
+  padding-left: 1.2rem;
+  margin: 0.6rem 0 1.4rem;
+}
+.op-lead-detail figure {
+  margin: 1.3rem 0;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border, #e4e8df);
+}
+.op-lead-detail blockquote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #6d796b);
+  white-space: pre-wrap;
+}
+.op-lead-detail figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+}
+.op-lead-empty {
+  padding: 1rem 0;
+  max-width: 48rem;
+}
+@media (max-width: 600px) {
+  .op-research-digest {
+    margin: 1.5rem 0 2rem;
+  }
+  .op-lead-heading {
+    display: block;
+  }
+  .op-lead-heading > span {
+    display: block;
+    margin-top: 0.45rem;
+    white-space: normal;
+  }
+  .op-regional-coverage {
+    font-size: 0.75rem;
+  }
+}

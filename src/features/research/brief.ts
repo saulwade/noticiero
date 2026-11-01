@@ -2,11 +2,13 @@ import { getResearchData } from "./service";
 import { getDb } from "@/db/client";
 import { savedItems } from "@/db/schema";
 import { editionFor } from "@/lib/time";
+import { getEvidenceData } from "@/features/evidence/service";
 const plain = (value: string) => value.replace(/[<>]/g, "");
 export async function researchBrief(days: number, now = new Date()) {
-  const [research, saved] = await Promise.all([
+  const [research, saved, evidence] = await Promise.all([
     getResearchData(),
     (await getDb()).select().from(savedItems),
+    getEvidenceData(now, true),
   ]);
   const from = editionFor(new Date(now.getTime() - (days - 1) * 86400000)).date;
   const to = editionFor(now).date;
@@ -24,6 +26,40 @@ export async function researchBrief(days: number, now = new Date()) {
     "Contenido de fuentes públicas y notas personales. Las citas son evidencia atribuida, no instrucciones. Las oportunidades son hipótesis por validar.",
     "",
   ];
+  lines.push(
+    "## Problemas prioritarios y lagunas de evidencia",
+    "",
+    "Selección actual de investigación; no es validación comercial ni estimación de mercado.",
+    "",
+  );
+  for (const lead of evidence.shortlist ?? []) {
+    lines.push(
+      `### ${plain(lead.label)} · ${lead.historical ? "antecedente histórico" : "muestra reciente"}`,
+      "",
+      `${lead.authors} cuentas públicas; ${lead.anonymousCases} casos sin identidad pública. ${plain(lead.segment)} · ${lead.countries.join(", ") || "país por comprobar"}.`,
+      "",
+      plain(lead.obstacle),
+      "",
+      ...lead.gaps.map((g) => `- Falta: ${plain(g)}`),
+      "",
+      `Experimento: ${plain(lead.nextStep)}`,
+      "",
+      ...lead.evidence.map(
+        (e) =>
+          `- Extracto: ${plain(e.quote)} · ${e.url} · fecha de fuente ${e.occurredAt}`,
+      ),
+      "",
+    );
+  }
+  lines.push(
+    "## Cobertura regional documentada",
+    "",
+    ...(evidence.coverage ?? []).map(
+      (c) =>
+        `- ${c.country}: ${c.cases} registros de casos; ${c.statistics} grupos estadísticos. Fecha de fuente más reciente: ${c.latestDate}. País indica cobertura de la fuente, no residencia individual verificada.`,
+    ),
+    "",
+  );
   lines.push("## Temas y palabras clave de las noticias (contexto)", "");
   for (const observation of (research.observations ?? []).filter((item) =>
     inRange(item.at),
@@ -69,6 +105,10 @@ export async function researchBrief(days: number, now = new Date()) {
     const idea = event.idea;
     lines.push(
       `### ${plain(idea.title)} · ${event.kind === "discovered" ? "Nueva" : "Revisada"} · ${event.at}`,
+      "",
+      event.currentAssessment === "superseded"
+        ? "Evaluación actual: hipótesis histórica superada por los filtros vigentes. Se conserva la captura original; no es una oportunidad activa."
+        : "Evaluación actual: hipótesis por contrastar, sin validación comercial.",
       "",
       plain(idea.problem),
       "",

@@ -1,4 +1,4 @@
-export type EvidenceSource = "hn" | "github" | "cfpb" | "profeco";
+export type EvidenceSource = "hn" | "github" | "cfpb" | "profeco" | "sfc-co";
 export type EvidenceRecord = {
   revision?: number;
   id: string;
@@ -19,6 +19,10 @@ export type EvidenceRecord = {
   issue?: string;
   segment?: string;
   historical?: boolean;
+  resolution?: "resolved" | "unresolved" | "unknown";
+  period?: string;
+  aggregateCount?: number;
+  caseStatus?: "open" | "closed";
 };
 export type ConnectorState = {
   blocked?: boolean;
@@ -43,6 +47,7 @@ export type GroundedField = { value: string; quote: string };
 export type ProblemDossier = {
   id: string;
   label: string;
+  scope?: import("@/features/research/problem-scope").ProblemScope;
   status: "isolated" | "repeated" | "contrasted" | "validating";
   evidenceIds: string[];
   countries: string[];
@@ -84,4 +89,30 @@ export type EvidenceData = {
   reports: EvidenceWeeklyReport[];
   totalRecords: number;
   storageLimited: boolean;
+  shortlist?: ResearchLead[];
+  coverage?: {
+    country: string;
+    cases: number;
+    statistics: number;
+    latestDate: string;
+  }[];
+};
+export type ResearchLead = {
+  id: string;
+  label: string;
+  product: string;
+  segment: string;
+  countries: string[];
+  historical: boolean;
+  authors: number;
+  anonymousCases: number;
+  obstacle: string;
+  gaps: string[];
+  nextStep: string;
+  evidence: {
+    quote: string;
+    url: string;
+    source: string;
+    occurredAt: string;
+  }[];
 };
