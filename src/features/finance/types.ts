@@ -1,3 +1,8 @@
+import type {
+  FinanceNewsWorkspace,
+  FinanceNewsEvent,
+  FinanceNewsReview,
+} from "./research-types";
 export type Currency = "MXN" | "USD";
 export type Instrument = {
   id: string;
@@ -54,6 +59,8 @@ export type FinanceSyncState = {
   value?: string;
   leaseToken?: string;
   leaseUntil?: string;
+  scanCursor?: string;
+  scanComplete?: boolean;
 };
 export type FinanceMarketStatus = {
   alphaVantageConfigured: boolean;
@@ -133,6 +140,8 @@ export type FinanceDecision = {
     instruments: Instrument[];
     theses?: FinanceThesis[];
     research?: CompanyResearch[];
+    news?: FinanceNewsEvent[];
+    newsReviews?: FinanceNewsReview[];
   };
 };
 export type FinancialFact = {
@@ -155,6 +164,7 @@ export type CompanyResearch = {
   warnings: string[];
 };
 export type FinanceData = {
+  newsResearch?: FinanceNewsWorkspace;
   market?: FinanceMarketStatus;
   relatedNews?: {
     instrumentId: string;

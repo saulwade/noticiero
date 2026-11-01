@@ -27,6 +27,10 @@ import {
   FinanceDailyStatus,
   FinanceProcessGuide,
 } from "./finance-daily-status";
+import {
+  FinanceNewsWorkspace,
+  FinanceCapturedNews,
+} from "./finance-news-workspace";
 import "./finance-workspace.css";
 
 const movementNames: Record<MovementKind, string> = {
@@ -352,6 +356,8 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
   }
   const disabled = demo || busy;
   const instruments = data?.instruments ?? [];
+  const hasMovements =
+    (data?.counts?.movements ?? data?.movements.length ?? 0) > 0;
   const instrument = (id: string) => instruments.find((i) => i.id === id);
 
   return (
@@ -365,7 +371,8 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
             <em>Con perspectiva.</em>
           </h1>
           <p>
-            Lo que aportas, lo que cambia y las razones detrás de cada decisión.
+            Noticias para investigar, una estrategia por construir y tus
+            movimientos cuando empieces a invertir.
           </p>
         </div>
         <div className="fi-heading-actions">
@@ -377,7 +384,7 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
             <ArrowDownToLine size={13} /> Exportar
           </button>
           <button
-            className="fi-button fi-primary"
+            className={`fi-button ${hasMovements ? "fi-primary" : ""}`}
             disabled={disabled || !data}
             onClick={() => {
               setTab("movements");
@@ -428,33 +435,40 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
         </div>
       ) : (
         <>
-          <div className="fi-overview">
-            <div>
-              <span>
-                {data.summary.complete
-                  ? "Valor del portafolio"
-                  : "Valor conocido · parcial"}
-              </span>
-              <strong>
-                {money(
-                  data.summary.complete
-                    ? data.summary.valueMxn
-                    : data.summary.knownValueMxn,
-                )}
-              </strong>
-              <small>MXN · {date(data.summary.asOf)}</small>
+          {hasMovements ? (
+            <div className="fi-overview">
+              <div>
+                <span>
+                  {data.summary.complete
+                    ? "Valor del portafolio"
+                    : "Valor conocido · parcial"}
+                </span>
+                <strong>
+                  {money(
+                    data.summary.complete
+                      ? data.summary.valueMxn
+                      : data.summary.knownValueMxn,
+                  )}
+                </strong>
+                <small>MXN · {date(data.summary.asOf)}</small>
+              </div>
+              <div>
+                <span>Dinero aportado</span>
+                <strong>{money(data.summary.contributionsMxn)}</strong>
+                <small>Los depósitos no son ganancias</small>
+              </div>
+              <div>
+                <span>Resultado acumulado</span>
+                <strong>{money(data.summary.pnlMxn)}</strong>
+                <small>Con los costos y retenciones registrados</small>
+              </div>
             </div>
-            <div>
-              <span>Dinero aportado</span>
-              <strong>{money(data.summary.contributionsMxn)}</strong>
-              <small>Los depósitos no son ganancias</small>
-            </div>
-            <div>
-              <span>Resultado acumulado</span>
-              <strong>{money(data.summary.pnlMxn)}</strong>
-              <small>Con los costos y retenciones registrados</small>
-            </div>
-          </div>
+          ) : (
+            <p className="fi-account-pending">
+              <Wallet size={14} /> Cartera sin iniciar · puedes leer e
+              investigar sin registrar dinero.
+            </p>
+          )}
           <div
             className="fi-tabs"
             role="group"
@@ -485,6 +499,15 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
           ) : null}
           {tab === "summary" ? (
             <>
+              <FinanceNewsWorkspace
+                data={data.newsResearch}
+                compact
+                disabled={disabled}
+                demo={demo}
+                onSave={(payload) => post("news-review", payload)}
+                onInvestigate={() => setTab("research")}
+              />
+
               {data.summary.warnings.length ? (
                 <details className="fi-disclosure fi-warning">
                   <summary>
@@ -499,7 +522,7 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
                   </ul>
                 </details>
               ) : null}
-              {!data.movements.length ? (
+              {!hasMovements ? (
                 <div className="fi-welcome">
                   <Wallet size={28} strokeWidth={1.2} />
                   <div>
@@ -515,86 +538,89 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
               ) : null}
               <FinanceDailyStatus market={data.market} demo={demo} />
               <FinanceProcessGuide />
-              <div className="fi-two-columns">
-                <article className="fi-panel">
-                  <span className="fi-eyebrow">LA SIGUIENTE APORTACIÓN</span>
-                  <h2>{data.summary.proposal.label}</h2>
-                  <p>{data.summary.proposal.reason}</p>
-                  <strong className="fi-amount">
-                    {money(data.summary.proposal.amountMxn)}
-                  </strong>
-                  {data.summary.proposal.items.length ? (
-                    <ul className="fi-proposals">
-                      {data.summary.proposal.items.map((item) => (
-                        <li key={item.instrumentId}>
-                          <span>
-                            {instrument(item.instrumentId)?.symbol ??
-                              (item.instrumentId === "CASH_MXN"
-                                ? "Efectivo MXN"
-                                : item.instrumentId === "CASH_USD"
-                                  ? "Efectivo USD"
-                                  : item.instrumentId)}
-                          </span>
-                          <strong>{money(item.amountMxn)}</strong>
-                          <small>
-                            Peso posterior {percent(item.afterWeight)}
-                          </small>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {data.summary.proposal.missing.length ? (
-                    <details className="fi-compact">
-                      <summary>Qué falta confirmar</summary>
-                      <ul>
-                        {data.summary.proposal.missing.map((item, i) => (
-                          <li key={i}>{item}</li>
+              {hasMovements ? (
+                <div className="fi-two-columns">
+                  <article className="fi-panel">
+                    <span className="fi-eyebrow">LA SIGUIENTE APORTACIÓN</span>
+                    <h2>{data.summary.proposal.label}</h2>
+                    <p>{data.summary.proposal.reason}</p>
+                    <strong className="fi-amount">
+                      {money(data.summary.proposal.amountMxn)}
+                    </strong>
+                    {data.summary.proposal.items.length ? (
+                      <ul className="fi-proposals">
+                        {data.summary.proposal.items.map((item) => (
+                          <li key={item.instrumentId}>
+                            <span>
+                              {instrument(item.instrumentId)?.symbol ??
+                                (item.instrumentId === "CASH_MXN"
+                                  ? "Efectivo MXN"
+                                  : item.instrumentId === "CASH_USD"
+                                    ? "Efectivo USD"
+                                    : item.instrumentId)}
+                            </span>
+                            <strong>{money(item.amountMxn)}</strong>
+                            <small>
+                              Peso posterior {percent(item.afterWeight)}
+                            </small>
+                          </li>
                         ))}
                       </ul>
-                    </details>
-                  ) : null}
-                  <p className="fi-footnote">
-                    Una simulación para revisar. Precios de referencia,
-                    disponibilidad y costos finales se confirman en el
-                    intermediario; Noticiero no ejecuta operaciones.
-                  </p>
-                </article>
-                <article className="fi-panel">
-                  <span className="fi-eyebrow">DISTRIBUCIÓN ACTUAL</span>
-                  <h2>Dónde está tu dinero</h2>
-                  {data.summary.allocation.length ? (
-                    <ul className="fi-distribution">
-                      {data.summary.allocation.map((item, i) => (
-                        <li key={`${item.label}-${i}`}>
-                          <span>{item.label}</span>
-                          <strong>{money(item.valueMxn)}</strong>
-                          <small>{percent(item.weight)}</small>
-                          {item.weight !== undefined ? (
-                            <div className="fi-bar">
-                              <i
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, item.weight))}%`,
-                                }}
-                              />
-                            </div>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>Aún no hay una distribución para comparar.</p>
-                  )}
-                  <div className="fi-cash">
-                    <span>Efectivo disponible</span>
-                    <strong>{money(data.summary.cash.MXN)} MXN</strong>
-                    <strong>{money(data.summary.cash.USD, "USD")} USD</strong>
-                  </div>
-                  <p className="fi-footnote">
-                    Moneda de cotización y exposición económica son diferentes.
-                    La composición por país o sector requiere fuentes fechadas.
-                  </p>
-                </article>
-              </div>
+                    ) : null}
+                    {data.summary.proposal.missing.length ? (
+                      <details className="fi-compact">
+                        <summary>Qué falta confirmar</summary>
+                        <ul>
+                          {data.summary.proposal.missing.map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                    <p className="fi-footnote">
+                      Una simulación para revisar. Precios de referencia,
+                      disponibilidad y costos finales se confirman en el
+                      intermediario; Noticiero no ejecuta operaciones.
+                    </p>
+                  </article>
+                  <article className="fi-panel">
+                    <span className="fi-eyebrow">DISTRIBUCIÓN ACTUAL</span>
+                    <h2>Dónde está tu dinero</h2>
+                    {data.summary.allocation.length ? (
+                      <ul className="fi-distribution">
+                        {data.summary.allocation.map((item, i) => (
+                          <li key={`${item.label}-${i}`}>
+                            <span>{item.label}</span>
+                            <strong>{money(item.valueMxn)}</strong>
+                            <small>{percent(item.weight)}</small>
+                            {item.weight !== undefined ? (
+                              <div className="fi-bar">
+                                <i
+                                  style={{
+                                    width: `${Math.min(100, Math.max(0, item.weight))}%`,
+                                  }}
+                                />
+                              </div>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>Aún no hay una distribución para comparar.</p>
+                    )}
+                    <div className="fi-cash">
+                      <span>Efectivo disponible</span>
+                      <strong>{money(data.summary.cash.MXN)} MXN</strong>
+                      <strong>{money(data.summary.cash.USD, "USD")} USD</strong>
+                    </div>
+                    <p className="fi-footnote">
+                      Moneda de cotización y exposición económica son
+                      diferentes. La composición por país o sector requiere
+                      fuentes fechadas.
+                    </p>
+                  </article>
+                </div>
+              ) : null}
               <details className="fi-disclosure">
                 <summary>
                   Posiciones y precios de referencia <ChevronRight size={14} />
@@ -1158,12 +1184,18 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
           ) : null}
           {tab === "research" ? (
             <>
-              <div className="fi-section-heading">
+              <FinanceNewsWorkspace
+                data={data.newsResearch}
+                disabled={disabled}
+                demo={demo}
+                onSave={(payload) => post("news-review", payload)}
+              />
+              <div className="fi-section-heading fi-tracking-heading">
                 <div>
-                  <h2>Investigar antes de decidir.</h2>
+                  <h2>Tu lista de seguimiento.</h2>
                   <p>
-                    Una lista breve, fuentes verificables y supuestos que puedas
-                    revisar.
+                    Opcional: agrega instrumentos concretos para desarrollar una
+                    tesis. Las noticias anteriores no requieren este registro.
                   </p>
                 </div>
               </div>
@@ -1248,10 +1280,11 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
               {!instruments.length ? (
                 <div className="fi-empty">
                   <BookOpen size={27} strokeWidth={1.2} />
-                  <h3>Una buena tesis empieza con una pregunta.</h3>
+                  <h3>Tu lista todavía está vacía.</h3>
                   <p>
-                    Agrega un instrumento sin convertirlo en una compra.
-                    Registrar seguimiento no crea una posición.
+                    Puedes empezar leyendo las noticias y guardando tus
+                    preguntas arriba. Agrega un instrumento cuando quieras
+                    investigarlo con más detalle; no crea una compra.
                   </p>
                 </div>
               ) : (
@@ -1729,6 +1762,10 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
                               ))}
                             </details>
                           ) : null}
+                          <FinanceCapturedNews
+                            events={d.snapshot.news}
+                            reviews={d.snapshot.newsReviews}
+                          />
                           <p className="fi-footnote">
                             Captura registrada el {date(d.createdAt)} con la
                             información disponible al guardar. La captura no

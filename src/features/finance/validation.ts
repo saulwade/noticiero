@@ -1,3 +1,4 @@
+import { financeNewsReviewSchema } from "./research-validation";
 import { z } from "zod";
 import { decimal, formatted } from "./decimal";
 import { financeDay } from "./engine";
@@ -82,6 +83,7 @@ const movement = z
       add("Registra el tipo de cambio ejecutado MXN por USD.");
   });
 export const financeActionSchema = z.discriminatedUnion("action", [
+  financeNewsReviewSchema.extend({ action: z.literal("news-review") }),
   z.object({
     action: z.literal("instrument"),
     symbol: z

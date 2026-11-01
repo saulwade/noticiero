@@ -9,6 +9,7 @@ export async function updateEdition(id: string) {
     await ideasStep(id);
     await financeStep();
     await marketStep(id);
+    await financeNewsStep();
     await finishStep(id);
   } catch {
     await failStep(id);
@@ -57,5 +58,16 @@ async function financeStep() {
     await syncDailyFinance();
   } catch {
     // Finance status is checked independently; preserve news publication on failure.
+  }
+}
+
+async function financeNewsStep() {
+  "use step";
+  const { collectFinanceNews } =
+    await import("@/features/finance/research-service");
+  try {
+    await collectFinanceNews();
+  } catch {
+    /* Status and previous archive are retained for operations. */
   }
 }

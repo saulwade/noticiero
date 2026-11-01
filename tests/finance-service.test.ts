@@ -12,6 +12,9 @@ const today = "2026-10-30";
 beforeEach(async () => {
   const db = await getDb();
   for (const table of [
+    t.financeNewsEvents,
+    t.financeNewsReviews,
+    t.financeNewsBriefs,
     t.financeSync,
     t.financeInstruments,
     t.financeMovements,
@@ -221,7 +224,10 @@ describe("archivo financiero independiente y auditable", () => {
     }));
     for (const set of [
       tables,
-      tables.filter((t) => t.name !== "finance_sync"),
+      tables.filter((t) => !t.name.startsWith("finance_news_")),
+      tables.filter(
+        (t) => !t.name.startsWith("finance_news_") && t.name !== "finance_sync",
+      ),
       tables.filter((t) => !t.name.startsWith("finance_")),
       tables.filter(
         (t) =>

@@ -1,3 +1,8 @@
+import { assertFinanceCapacity } from "./capacity";
+import {
+  getFinanceNewsWorkspace,
+  saveFinanceNewsReview,
+} from "./research-service";
 import { alphaVantageKey } from "./daily-providers";
 import { expectedUsClose } from "./market-calendar";
 import { randomUUID } from "node:crypto";
@@ -52,10 +57,12 @@ async function load(reader: Reader, now = new Date()): Promise<FinanceData> {
     market: {
       alphaVantageConfigured: Boolean(alphaVantageKey()),
       expectedPriceSession: expectedUsClose(now),
-      sources: sync.map((r) => {
-        const { leaseToken: _, leaseUntil: __, ...state } = r.data; // eslint-disable-line @typescript-eslint/no-unused-vars
-        return state;
-      }),
+      sources: sync
+        .filter((r) => r.id !== "news-research")
+        .map((r) => {
+          const { leaseToken: _, leaseUntil: __, ...state } = r.data; // eslint-disable-line @typescript-eslint/no-unused-vars
+          return state;
+        }),
     },
     counts: {
       movements: mr.length,
@@ -107,19 +114,37 @@ export function boundedFinanceView(data: FinanceData): FinanceData {
     theses: data.theses.slice(0, 40),
     decisions: data.decisions.slice(0, 20),
     research: data.research.slice(0, 20),
+    ...(data.newsResearch
+      ? {
+          newsResearch: {
+            ...data.newsResearch,
+            events: [...data.newsResearch.events],
+            reviews: [...data.newsResearch.reviews],
+            briefs: [...data.newsResearch.briefs],
+          },
+        }
+      : {}),
   };
   result.viewLimited =
     result.movements.length < data.movements.length ||
     result.marks.length < data.marks.length ||
     result.theses.length < data.theses.length ||
     result.decisions.length < data.decisions.length ||
-    result.research.length < data.research.length;
+    result.research.length < data.research.length ||
+    Boolean(data.newsResearch?.viewLimited);
   const arrays = [
     result.decisions,
     result.theses,
     result.movements,
     result.marks,
     result.research,
+    ...(result.newsResearch
+      ? [
+          result.newsResearch.reviews,
+          result.newsResearch.events,
+          result.newsResearch.briefs,
+        ]
+      : []),
   ];
   while (Buffer.byteLength(JSON.stringify(result)) > 1_500_000) {
     const list = arrays.find((a) => a.length > 0);
@@ -157,6 +182,7 @@ export async function getFinanceData(full = false, now = new Date()) {
         })),
     );
   }
+  data.newsResearch = await getFinanceNewsWorkspace(full, now);
   return full ? data : boundedFinanceView(data);
 }
 function checkStorage(data: FinanceData) {
@@ -194,13 +220,16 @@ function checkDuplicate(old: Movement, newMovement: Movement) {
       "La referencia ya existe con datos diferentes. Revisa el comprobante.",
     );
 }
-export async function financeAction(raw: unknown) {
+export async function financeAction(
+  raw: unknown,
+): Promise<{ message: string; instrumentId?: string }> {
   const parsed = financeActionSchema.safeParse(raw);
   if (!parsed.success)
     throw new Error(parsed.error.issues[0]?.message ?? "Revisa los campos.");
   const input = parsed.data,
     db = await getDb(),
     at = new Date().toISOString();
+  if (input.action === "news-review") return saveFinanceNewsReview(input);
   if (input.action === "research") {
     const data = await load(db),
       instrument = data.instruments.find((i) => i.id === input.instrumentId);
@@ -226,6 +255,7 @@ export async function financeAction(raw: unknown) {
         .insert(financeResearch)
         .values({ id: research.id, data: research })
         .onConflictDoNothing();
+      await assertFinanceCapacity(tx);
     });
     return {
       message:
@@ -234,249 +264,257 @@ export async function financeAction(raw: unknown) {
   }
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(7202633)`);
-    const data = await load(tx);
-    checkStorage(data);
-    if (input.action === "instrument") {
-      const { action: _, ...fields } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
-      const id = hash(
-        `instrument:${fields.symbol.toUpperCase()}:${fields.exchange.toUpperCase()}:${fields.currency}`,
-      );
-      const old = data.instruments.find((i) => i.id === id);
-      if (!old && data.instruments.length >= 8)
-        throw new Error(
-          "La primera versión permite ocho instrumentos. Mantén una lista enfocada.",
+    const result = await (async () => {
+      const data = await load(tx);
+      checkStorage(data);
+      if (input.action === "instrument") {
+        const { action: _, ...fields } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
+        const id = hash(
+          `instrument:${fields.symbol.toUpperCase()}:${fields.exchange.toUpperCase()}:${fields.currency}`,
         );
-      const instrument: Instrument = {
-        ...fields,
-        id,
-        symbol: fields.symbol.toUpperCase(),
-        exchange: fields.exchange.toUpperCase(),
-        createdAt: old?.createdAt ?? at,
-      };
-      const instruments = [
-        ...data.instruments.filter((i) => i.id !== id),
-        instrument,
-      ];
-      replay(instruments, data.movements, financeDay());
-      await tx
-        .insert(financeInstruments)
-        .values({ id, data: instrument })
-        .onConflictDoUpdate({
-          target: financeInstruments.id,
-          set: { data: instrument },
-        });
-      return {
-        message: old
-          ? "Instrumento actualizado; el diario conserva sus capturas anteriores."
-          : "Instrumento registrado.",
-        instrumentId: id,
-      };
-    }
-    if (input.action === "movement" || input.action === "import") {
-      const entries =
-        input.action === "import"
-          ? parseFinanceCsv(input.csv, data.instruments)
-          : [movementSchema.parse(input)];
-      const known = new Map(data.movements.map((m) => [m.id, m]));
-      const added: Movement[] = [];
-      const previousSequence = Math.max(
-        0,
-        ...data.movements.map((m) => m.sequence ?? 0),
-      );
-      for (const entry of entries) {
-        const m = {
-          ...movementRecord(entry, at),
-          sequence: previousSequence + added.length + 1,
+        const old = data.instruments.find((i) => i.id === id);
+        if (!old && data.instruments.length >= 8)
+          throw new Error(
+            "La primera versión permite ocho instrumentos. Mantén una lista enfocada.",
+          );
+        const instrument: Instrument = {
+          ...fields,
+          id,
+          symbol: fields.symbol.toUpperCase(),
+          exchange: fields.exchange.toUpperCase(),
+          createdAt: old?.createdAt ?? at,
         };
-        const previous = known.get(m.id);
-        if (previous) {
-          checkDuplicate(previous, m);
-          continue;
-        }
-        known.set(m.id, m);
-        added.push(m);
+        const instruments = [
+          ...data.instruments.filter((i) => i.id !== id),
+          instrument,
+        ];
+        replay(instruments, data.movements, financeDay());
+        await tx
+          .insert(financeInstruments)
+          .values({ id, data: instrument })
+          .onConflictDoUpdate({
+            target: financeInstruments.id,
+            set: { data: instrument },
+          });
+        return {
+          message: old
+            ? "Instrumento actualizado; el diario conserva sus capturas anteriores."
+            : "Instrumento registrado.",
+          instrumentId: id,
+        };
       }
-      if (known.size > 2000)
-        throw new Error(
-          "Máximo 2,000 movimientos en esta etapa; el archivo anterior se conserva.",
+      if (input.action === "movement" || input.action === "import") {
+        const entries =
+          input.action === "import"
+            ? parseFinanceCsv(input.csv, data.instruments)
+            : [movementSchema.parse(input)];
+        const known = new Map(data.movements.map((m) => [m.id, m]));
+        const added: Movement[] = [];
+        const previousSequence = Math.max(
+          0,
+          ...data.movements.map((m) => m.sequence ?? 0),
         );
-      // Replay the full ledger, including backdated imports, before any insert.
-      replay(data.instruments, [...known.values()], financeDay());
-      checkStorage({ ...data, movements: [...known.values()] });
-      for (const m of added)
-        await tx.insert(financeMovements).values({ id: m.id, data: m });
-      return {
-        message: `${added.length} movimientos guardados; ${entries.length - added.length} referencias repetidas omitidas.`,
-        added: added.length,
-      };
-    }
-    if (input.action === "reverse") {
-      const original = data.movements.find((m) => m.id === input.movementId);
-      if (!original || original.reversesId)
-        throw new Error("Movimiento original no encontrado.");
-      if (data.movements.some((m) => m.reversesId === original.id))
-        return { message: "La corrección ya está guardada." };
-      if (data.movements.length >= 2000)
-        throw new Error(
-          "Límite de archivo alcanzado. Exporta antes de ampliar capacidad.",
-        );
-      const reversed: Movement = {
-        ...original,
-        id: hash(`reverse:${original.id}`),
-        reversesId: original.id,
-        note: input.note,
-        createdAt: at,
-        date: original.date,
-      };
-      const movements = [...data.movements, reversed];
-      replay(data.instruments, movements, financeDay());
-      await tx
-        .insert(financeMovements)
-        .values({ id: reversed.id, data: reversed });
-      return {
-        message:
-          "Corrección guardada. El movimiento original y las decisiones previas se conservan.",
-      };
-    }
-    if (input.action === "mark") {
-      if (
-        input.kind === "price" &&
-        !data.instruments.some((i) => i.id === input.instrumentId)
-      )
-        throw new Error("Instrumento no encontrado.");
-      if (data.marks.length >= 20000)
-        throw new Error(
-          "Máximo 20,000 referencias en este archivo. No se borró el archivo.",
-        );
-      const { action: _, ...fields } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
-      const mark: FinanceMark = {
-        ...fields,
-        id: randomUUID(),
-        instrumentId: input.kind === "fx" ? undefined : input.instrumentId,
-        capturedAt: at,
-      };
-      checkStorage({ ...data, marks: [...data.marks, mark] });
-      await tx.insert(financeMarks).values({ id: mark.id, data: mark });
-      return {
-        message:
-          "Valoración fechada guardada; no sustituye el precio ejecutado.",
-      };
-    }
-    if (input.action === "policy") {
-      const history = await tx.select().from(financePolicies);
-      if (history.length >= 200)
-        throw new Error(
-          "Máximo 200 versiones de política. El historial se conserva.",
-        );
-      if (
-        Buffer.byteLength(JSON.stringify(data)) +
-          Buffer.byteLength(JSON.stringify(history)) >
-        49_000_000
-      )
-        throw new Error(
-          "Archivo cerca del límite: exporta antes de ampliar capacidad.",
-        );
-      if (
-        input.targets.some(
-          (t) =>
-            !["CASH_MXN", "CASH_USD"].includes(t.instrumentId) &&
-            !data.instruments.some((i) => i.id === t.instrumentId),
+        for (const entry of entries) {
+          const m = {
+            ...movementRecord(entry, at),
+            sequence: previousSequence + added.length + 1,
+          };
+          const previous = known.get(m.id);
+          if (previous) {
+            checkDuplicate(previous, m);
+            continue;
+          }
+          known.set(m.id, m);
+          added.push(m);
+        }
+        if (known.size > 2000)
+          throw new Error(
+            "Máximo 2,000 movimientos en esta etapa; el archivo anterior se conserva.",
+          );
+        // Replay the full ledger, including backdated imports, before any insert.
+        replay(data.instruments, [...known.values()], financeDay());
+        checkStorage({ ...data, movements: [...known.values()] });
+        for (const m of added)
+          await tx.insert(financeMovements).values({ id: m.id, data: m });
+        return {
+          message: `${added.length} movimientos guardados; ${entries.length - added.length} referencias repetidas omitidas.`,
+          added: added.length,
+        };
+      }
+      if (input.action === "reverse") {
+        const original = data.movements.find((m) => m.id === input.movementId);
+        if (!original || original.reversesId)
+          throw new Error("Movimiento original no encontrado.");
+        if (data.movements.some((m) => m.reversesId === original.id))
+          return { message: "La corrección ya está guardada." };
+        if (data.movements.length >= 2000)
+          throw new Error(
+            "Límite de archivo alcanzado. Exporta antes de ampliar capacidad.",
+          );
+        const reversed: Movement = {
+          ...original,
+          id: hash(`reverse:${original.id}`),
+          reversesId: original.id,
+          note: input.note,
+          createdAt: at,
+          date: original.date,
+        };
+        const movements = [...data.movements, reversed];
+        replay(data.instruments, movements, financeDay());
+        await tx
+          .insert(financeMovements)
+          .values({ id: reversed.id, data: reversed });
+        return {
+          message:
+            "Corrección guardada. El movimiento original y las decisiones previas se conservan.",
+        };
+      }
+      if (input.action === "mark") {
+        if (
+          input.kind === "price" &&
+          !data.instruments.some((i) => i.id === input.instrumentId)
         )
-      )
-        throw new Error(
-          "La distribución contiene un instrumento no registrado.",
-        );
-      if (
-        new Set(input.targets.map((t) => t.instrumentId)).size !==
-        input.targets.length
-      )
-        throw new Error("No repitas instrumentos en la distribución.");
-      if (
-        input.approved &&
-        (!input.targets.length ||
-          Math.round(input.targets.reduce((s, t) => s + t.weight * 100, 0)) !==
-            10000)
-      )
-        throw new Error(
-          "Para aprobar, los pesos deben sumar exactamente 100%.",
-        );
-      const policy: FinancePolicy = {
-        monthlyContributionMxn: input.monthlyContributionMxn,
-        targets: input.targets,
-        approved: input.approved,
-        updatedAt: at,
-      };
-      await tx
-        .insert(financePolicies)
-        .values({ id: randomUUID(), data: policy });
-      return {
-        message: input.approved
-          ? "Política guardada y aprobada. Las propuestas requieren revisión manual."
-          : "Borrador guardado; no se propone una compra hasta aprobarlo.",
-      };
-    }
-    if (input.action === "thesis") {
-      if (!data.instruments.some((i) => i.id === input.instrumentId))
-        throw new Error("Instrumento no encontrado.");
-      if (data.theses.length >= 200)
-        throw new Error(
-          "Límite de versiones de tesis alcanzado. Se conserva el historial.",
-        );
-      const { action: _, ...fields } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
-      const thesis: FinanceThesis = {
-        ...fields,
-        id: randomUUID(),
-        createdAt: at,
-      };
-      checkStorage({ ...data, theses: [...data.theses, thesis] });
-      await tx.insert(financeTheses).values({ id: thesis.id, data: thesis });
-      return { message: "Nueva versión de tesis guardada con sus fuentes." };
-    }
-    if (input.action === "decision") {
-      const action = input.decision ?? input.actionText;
-      if (!action) throw new Error("Describe la decisión.");
-      if (data.decisions.length >= 200)
-        throw new Error(
-          "Límite de decisiones alcanzado. Exporta antes de ampliar capacidad.",
-        );
-      const latest = new Map<string, FinanceMark>();
-      for (const m of [...data.marks].sort(
-        (a, b) =>
-          a.asOf.localeCompare(b.asOf) ||
-          a.capturedAt.localeCompare(b.capturedAt),
-      ))
-        latest.set(m.kind === "fx" ? "FX" : m.instrumentId!, m);
-      const decision: FinanceDecision = {
-        id: randomUUID(),
-        date: input.date,
-        action,
-        reason: input.reason,
-        alternatives: input.alternatives,
-        revisitWhen: input.revisitWhen,
-        createdAt: at,
-        snapshot: {
-          summary: data.summary,
-          policy: data.policy,
-          marks: [...latest.values()],
-          instruments: data.instruments,
-          theses: data.instruments.flatMap((i) =>
-            data.theses.filter((t) => t.instrumentId === i.id).slice(0, 1),
-          ),
-          research: data.instruments.flatMap((i) =>
-            data.research.filter((r) => r.instrumentId === i.id).slice(0, 1),
-          ),
-        },
-      };
-      checkStorage({ ...data, decisions: [...data.decisions, decision] });
-      await tx
-        .insert(financeDecisions)
-        .values({ id: decision.id, data: decision });
-      return {
-        message:
-          "Decisión guardada con la información disponible hoy. Una revisión nueva conserva esta captura.",
-      };
-    }
-    throw new Error("Acción desconocida.");
+          throw new Error("Instrumento no encontrado.");
+        if (data.marks.length >= 20000)
+          throw new Error(
+            "Máximo 20,000 referencias en este archivo. No se borró el archivo.",
+          );
+        const { action: _, ...fields } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
+        const mark: FinanceMark = {
+          ...fields,
+          id: randomUUID(),
+          instrumentId: input.kind === "fx" ? undefined : input.instrumentId,
+          capturedAt: at,
+        };
+        checkStorage({ ...data, marks: [...data.marks, mark] });
+        await tx.insert(financeMarks).values({ id: mark.id, data: mark });
+        return {
+          message:
+            "Valoración fechada guardada; no sustituye el precio ejecutado.",
+        };
+      }
+      if (input.action === "policy") {
+        const history = await tx.select().from(financePolicies);
+        if (history.length >= 200)
+          throw new Error(
+            "Máximo 200 versiones de política. El historial se conserva.",
+          );
+        if (
+          Buffer.byteLength(JSON.stringify(data)) +
+            Buffer.byteLength(JSON.stringify(history)) >
+          49_000_000
+        )
+          throw new Error(
+            "Archivo cerca del límite: exporta antes de ampliar capacidad.",
+          );
+        if (
+          input.targets.some(
+            (t) =>
+              !["CASH_MXN", "CASH_USD"].includes(t.instrumentId) &&
+              !data.instruments.some((i) => i.id === t.instrumentId),
+          )
+        )
+          throw new Error(
+            "La distribución contiene un instrumento no registrado.",
+          );
+        if (
+          new Set(input.targets.map((t) => t.instrumentId)).size !==
+          input.targets.length
+        )
+          throw new Error("No repitas instrumentos en la distribución.");
+        if (
+          input.approved &&
+          (!input.targets.length ||
+            Math.round(
+              input.targets.reduce((s, t) => s + t.weight * 100, 0),
+            ) !== 10000)
+        )
+          throw new Error(
+            "Para aprobar, los pesos deben sumar exactamente 100%.",
+          );
+        const policy: FinancePolicy = {
+          monthlyContributionMxn: input.monthlyContributionMxn,
+          targets: input.targets,
+          approved: input.approved,
+          updatedAt: at,
+        };
+        await tx
+          .insert(financePolicies)
+          .values({ id: randomUUID(), data: policy });
+        return {
+          message: input.approved
+            ? "Política guardada y aprobada. Las propuestas requieren revisión manual."
+            : "Borrador guardado; no se propone una compra hasta aprobarlo.",
+        };
+      }
+      if (input.action === "thesis") {
+        if (!data.instruments.some((i) => i.id === input.instrumentId))
+          throw new Error("Instrumento no encontrado.");
+        if (data.theses.length >= 200)
+          throw new Error(
+            "Límite de versiones de tesis alcanzado. Se conserva el historial.",
+          );
+        const { action: _, ...fields } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
+        const thesis: FinanceThesis = {
+          ...fields,
+          id: randomUUID(),
+          createdAt: at,
+        };
+        checkStorage({ ...data, theses: [...data.theses, thesis] });
+        await tx.insert(financeTheses).values({ id: thesis.id, data: thesis });
+        return { message: "Nueva versión de tesis guardada con sus fuentes." };
+      }
+      if (input.action === "decision") {
+        const action = input.decision ?? input.actionText;
+        if (!action) throw new Error("Describe la decisión.");
+        if (data.decisions.length >= 200)
+          throw new Error(
+            "Límite de decisiones alcanzado. Exporta antes de ampliar capacidad.",
+          );
+        const latest = new Map<string, FinanceMark>();
+        for (const m of [...data.marks].sort(
+          (a, b) =>
+            a.asOf.localeCompare(b.asOf) ||
+            a.capturedAt.localeCompare(b.capturedAt),
+        ))
+          latest.set(m.kind === "fx" ? "FX" : m.instrumentId!, m);
+        const knownNews = await getFinanceNewsWorkspace(false, new Date(), tx);
+        const decision: FinanceDecision = {
+          id: randomUUID(),
+          date: input.date,
+          action,
+          reason: input.reason,
+          alternatives: input.alternatives,
+          revisitWhen: input.revisitWhen,
+          createdAt: at,
+          snapshot: {
+            summary: data.summary,
+            policy: data.policy,
+            marks: [...latest.values()],
+            instruments: data.instruments,
+            theses: data.instruments.flatMap((i) =>
+              data.theses.filter((t) => t.instrumentId === i.id).slice(0, 1),
+            ),
+            research: data.instruments.flatMap((i) =>
+              data.research.filter((r) => r.instrumentId === i.id).slice(0, 1),
+            ),
+            news: knownNews.events.slice(0, 5),
+            newsReviews: knownNews.reviews.slice(0, 5),
+          },
+        };
+        checkStorage({ ...data, decisions: [...data.decisions, decision] });
+        await tx
+          .insert(financeDecisions)
+          .values({ id: decision.id, data: decision });
+        return {
+          message:
+            "Decisión guardada con la información disponible hoy. Una revisión nueva conserva esta captura.",
+        };
+      }
+      throw new Error("Acción desconocida.");
+    })();
+    await assertFinanceCapacity(tx);
+    return result;
   });
 }
 export async function exportFinance() {

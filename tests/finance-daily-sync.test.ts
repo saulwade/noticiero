@@ -6,11 +6,31 @@ import { getDb } from "@/db/client";
 import * as t from "@/db/schema";
 import {
   syncDailyFinance as runDailySync,
-  financeSyncFindings,
+  financeSyncFindings as allFinanceSyncFindings,
 } from "@/features/finance/daily-sync";
 import type { Instrument, FinanceSyncState } from "@/features/finance/types";
 const syncDailyFinance: typeof runDailySync = (at, providers) =>
   runDailySync(at, providers, { clock: () => at!, wait: async () => {} });
+const financeSyncFindings: typeof allFinanceSyncFindings = (
+  states,
+  instruments,
+  now = new Date(),
+) =>
+  allFinanceSyncFindings(
+    [
+      ...states,
+      {
+        id: "news-research",
+        label: "Investigación",
+        provider: "Motor local",
+        status: "ok",
+        message: "Fixture",
+        lastSuccess: now.toISOString(),
+      },
+    ],
+    instruments,
+    now,
+  );
 const now = new Date("2026-10-31T02:30:00Z");
 const at = now.toISOString();
 const stock: Instrument = {
@@ -42,6 +62,9 @@ beforeEach(async () => {
   const db = await getDb();
   await db.delete(t.leases).where(eq(t.leases.name, alphaSlotName));
   for (const table of [
+    t.financeNewsEvents,
+    t.financeNewsReviews,
+    t.financeNewsBriefs,
     t.financeSync,
     t.financeMarks,
     t.financeInstruments,
@@ -290,5 +313,27 @@ describe("alertas de finanzas sin falsas alarmas por fin de semana", () => {
     expect(
       financeSyncFindings([s], [stock], monday).map((f) => f.id),
     ).toContain(`finance-price-${stock.id}`);
+  });
+});
+
+describe("estado independiente del informe financiero", () => {
+  it("avisa si falta o falla la investigación sin requerir posiciones", () => {
+    const finding = allFinanceSyncFindings([], [], now);
+    expect(finding.some((f) => f.id === "finance-news-research")).toBe(true);
+    expect(
+      allFinanceSyncFindings(
+        [
+          {
+            id: "news-research",
+            label: "Investigación",
+            provider: "Motor local",
+            status: "error",
+            message: "Pendiente",
+          },
+        ],
+        [],
+        now,
+      ).some((f) => f.id === "finance-news-research"),
+    ).toBe(true);
   });
 });

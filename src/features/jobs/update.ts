@@ -361,6 +361,13 @@ export async function runLocalUpdate(id: string) {
       // Operations detects missing/stuck finance state independently.
     }
     await collectMarket(id);
+    try {
+      const { collectFinanceNews } =
+        await import("@/features/finance/research-service");
+      await collectFinanceNews();
+    } catch {
+      /* Financial research failure must not discard the news edition. */
+    }
     await finishUpdate(id);
   } catch {
     await failUpdate(id);

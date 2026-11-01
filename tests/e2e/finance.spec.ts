@@ -234,7 +234,7 @@ test("portafolio: aportación, conversión, compra, referencias y diario persist
   await page.goto("/");
   let portfolio = await openFinance(page, isMobile);
   await expect(
-    portfolio.getByText("Dinero aportado", { exact: true }),
+    portfolio.getByRole("button", { name: "Movimientos", exact: true }),
   ).toBeVisible();
 
   await portfolio
@@ -536,6 +536,338 @@ test("referencias diarias y guía sin registrar operaciones ni consultar proveed
   expect(financeRequests.length).toBeGreaterThan(0);
   expect(financeRequests.every((method) => method === "GET")).toBe(true);
   expect(providerRequests).toEqual([]);
+  expect(errors).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("noticias financieras sin cartera: investigar, guardar versiones y revisar el informe", async ({
+  page,
+  isMobile,
+}) => {
+  const now = new Date();
+  const recent = new Date(now.getTime() - 3600000).toISOString();
+  const old = new Date(now.getTime() - 10 * 86400000).toISOString();
+  const event = {
+    id: "financial-news-fixture",
+    storyId: "story-financial-fixture",
+    contentHash: "fixture-hash",
+    engineVersion: "fixture-v1",
+    title: "Microsoft reports a change in infrastructure spending",
+    url: "https://example.com/financial-fixture",
+    sourceId: "synthetic",
+    sourceName: "Fuente sintética de prueba",
+    publishedAt: recent,
+    capturedAt: now.toISOString(),
+    category: "Negocios",
+    coverage: "excerpt",
+    excerpt:
+      "Microsoft reported spending changes. The financial effect remains uncertain.",
+    summary:
+      "Microsoft reported spending changes. The financial effect remains uncertain.",
+    summaryLanguage: "en",
+    companies: [{ symbol: "MSFT", name: "Microsoft", private: false }],
+    eventKind: "infrastructure",
+    topic: "Infraestructura",
+    keywords: ["spending"],
+    mechanismHypothesis:
+      "Si cambia el gasto, conviene contrastar sus efectos en costos y caja.",
+    questions: ["¿Qué cambió en la inversión y en qué periodo?"],
+    missingEvidence: ["Confirmar cifras y comparar periodos homogéneos."],
+    tone: {
+      label: "unclassified",
+      positiveTerms: [],
+      negativeTerms: [],
+      method: "Diccionario de prueba",
+      caveat:
+        "El lenguaje del texto no predice el rendimiento de una inversión.",
+    },
+  };
+  const older = {
+    ...event,
+    id: "older-financial-fixture",
+    storyId: "older-story-fixture",
+    title: "A bank publishes a previous financial update",
+    url: "https://example.com/older-financial-fixture",
+    publishedAt: old,
+    companies: [{ symbol: "JPM", name: "JPMorgan Chase", private: false }],
+    topic: "Resultados",
+  };
+  const archivedOnly = {
+    ...event,
+    id: "archived-only-fixture",
+    storyId: "archived-only-story",
+    title: "Noticia archivada fuera de la ventana de treinta días",
+    url: "https://example.com/archived-note-only",
+    publishedAt: new Date(now.getTime() - 45 * 86400000).toISOString(),
+    companies: [{ symbol: "JPM", name: "JPMorgan Chase", private: false }],
+  };
+  const reviews: Array<{
+    id: string;
+    eventId: string;
+    storyId: string;
+    status: string;
+    note: string;
+    openQuestions: string;
+    createdAt: string;
+    snapshot: typeof event;
+  }> = [
+    {
+      id: "archived-note-only",
+      eventId: archivedOnly.id,
+      storyId: archivedOnly.storyId,
+      status: "monitor",
+      note: "Razón conservada aunque la noticia ya no aparezca en el feed.",
+      openQuestions: "Contrastar el siguiente reporte.",
+      createdAt: recent,
+      snapshot: archivedOnly,
+    },
+  ];
+  const posts: Array<Record<string, unknown>> = [];
+  const providers: string[] = [];
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (/alphavantage|frankfurter/.test(url.hostname))
+      providers.push(url.hostname);
+  });
+  const brief = {
+    id: "brief-fixture",
+    date: now.toISOString().slice(0, 10),
+    createdAt: now.toISOString(),
+    engineVersion: "fixture-v1",
+    eventIds: [event.id],
+    eventCount: 1,
+    companyCounts: [
+      { symbol: "MSFT", name: "Microsoft", count: 1, private: false },
+    ],
+    themes: [{ label: "Infraestructura", count: 1 }],
+    questions: ["¿Qué cifras faltan para confirmar el mecanismo?"],
+    quoteContext: [
+      {
+        symbol: "MSFT",
+        price: 100,
+        change: 1,
+        percent: 1.01,
+        currency: "USD",
+        tradingDay: now.toISOString().slice(0, 10),
+        fetchedAt: now.toISOString(),
+        provider: "Proveedor sintético",
+      },
+    ],
+    caveat: "Una cotización es contexto, no prueba de causalidad.",
+  };
+  const summary = {
+    asOf: now.toISOString().slice(0, 10),
+    complete: true,
+    cash: { MXN: "0", USD: "0" },
+    knownValueMxn: "0",
+    valueMxn: "0",
+    contributionsMxn: "0",
+    withdrawalsMxn: "0",
+    pnlMxn: "0",
+    positions: [],
+    warnings: [],
+    allocation: [],
+    proposal: {
+      status: "blocked",
+      label: "Sin política aprobada",
+      reason: "No hay cartera real.",
+      amountMxn: "0",
+      items: [],
+      missing: [],
+    },
+    performance: { reason: "Sin movimientos." },
+  };
+  await page.route("**/api/finance", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      posts.push(body);
+      const version = posts.length;
+      reviews.unshift({
+        id: `review-${version}`,
+        eventId: body.eventId,
+        storyId: event.storyId,
+        status: body.status,
+        note: body.note,
+        openQuestions: body.openQuestions,
+        createdAt: new Date(now.getTime() + version * 1000).toISOString(),
+        snapshot: { ...event },
+      });
+      await route.fulfill({
+        json: { message: "Nota de investigación guardada con su ficha." },
+      });
+    } else
+      await route.fulfill({
+        json: {
+          instruments: [],
+          movements: [],
+          marks: [],
+          theses: [],
+          decisions: [],
+          research: [],
+          summary,
+          newsResearch: {
+            events: [event, older],
+            reviews,
+            briefs: [brief],
+            totalEvents: 2,
+            totalVersions: 2,
+            totalReviews: reviews.length,
+            totalBriefs: 1,
+            viewLimited: false,
+            lastUpdatedAt: now.toISOString(),
+            message: "Fichas sintéticas para pruebas de interfaz.",
+          },
+        },
+      });
+  });
+  await page.goto("/");
+  let portfolio = await openFinance(page, isMobile);
+  await expect(
+    portfolio.getByText("Cartera sin iniciar", { exact: false }),
+  ).toBeVisible();
+  await expect(portfolio.locator(".fi-overview")).toHaveCount(0);
+  await expect(
+    portfolio.getByRole("heading", {
+      name: "Qué pasó. Qué investigar.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const compact = portfolio.getByRole("region", {
+    name: "Panorama financiero",
+  });
+  await expect(
+    compact.getByRole("heading", { name: event.title, exact: true }),
+  ).toBeVisible();
+  await expect(
+    compact.getByRole("article", {
+      name: `Noticia financiera: ${event.title}`,
+    }),
+  ).toContainText(event.summary);
+  await portfolio
+    .getByRole("button", { name: "Investigar noticias", exact: true })
+    .click();
+  let investigation = portfolio.getByRole("region", {
+    name: "Investigación de noticias financieras",
+  });
+  await expect(
+    investigation.getByRole("heading", { name: event.title, exact: true }),
+  ).toBeVisible();
+  await expect(
+    investigation.getByRole("heading", { name: older.title, exact: true }),
+  ).toHaveCount(0);
+  await investigation
+    .getByLabel("Periodo de noticias", { exact: true })
+    .selectOption("30");
+  await expect(
+    investigation.getByRole("heading", { name: older.title, exact: true }),
+  ).toBeVisible();
+  await investigation
+    .getByLabel("Empresa o tema", { exact: true })
+    .selectOption("company:MSFT");
+  await expect(
+    investigation.getByRole("heading", { name: older.title, exact: true }),
+  ).toHaveCount(0);
+  let card = investigation.getByRole("article", {
+    name: `Noticia financiera: ${event.title}`,
+  });
+  await expect(card.getByRole("link", { name: "Leer fuente" })).toHaveAttribute(
+    "href",
+    event.url,
+  );
+  await card.getByText("Investigar noticia", { exact: true }).click();
+  await expect(card).toContainText(event.mechanismHypothesis);
+  await expect(card).toContainText(event.questions[0]);
+  await expect(card).toContainText(
+    "Una mención no demuestra impacto financiero.",
+  );
+  let form = card.getByRole("form", { name: `Nota para ${event.title}` });
+  await form
+    .getByLabel("Mi conclusión provisional", { exact: true })
+    .selectOption("monitor");
+  await form
+    .getByLabel("Mi nota de investigación", { exact: true })
+    .fill("Primera interpretación sintética; falta contrastar cifras.");
+  await form
+    .getByLabel("Qué quiero contrastar", { exact: true })
+    .fill("Buscar la publicación primaria y el periodo comparable.");
+  await form
+    .getByRole("button", { name: "Guardar nota de investigación", exact: true })
+    .click();
+  await expect(portfolio.getByRole("status")).toContainText(
+    "Nota de investigación guardada",
+  );
+  await expect(
+    card.getByText("Mis notas guardadas", { exact: false }),
+  ).toBeVisible();
+  form = card.getByRole("form", { name: `Nota para ${event.title}` });
+  await form
+    .getByLabel("Mi nota de investigación", { exact: true })
+    .fill("Segunda interpretación sintética con una pregunta más precisa.");
+  await form
+    .getByRole("button", { name: "Guardar nota de investigación", exact: true })
+    .click();
+  await expect(
+    card.getByText("Mis notas guardadas", { exact: false }),
+  ).toContainText("2");
+  await page.reload();
+  portfolio = await openFinance(page, isMobile);
+  await portfolio
+    .getByRole("button", { name: "Investigar", exact: true })
+    .click();
+  investigation = portfolio.getByRole("region", {
+    name: "Investigación de noticias financieras",
+  });
+  card = investigation.getByRole("article", {
+    name: `Noticia financiera: ${event.title}`,
+  });
+  await card.getByText("Investigar noticia", { exact: true }).click();
+  await card.getByText("Mis notas guardadas", { exact: false }).click();
+  await expect(card.locator(".fi-news-history")).toContainText(
+    "Primera interpretación sintética",
+  );
+  await expect(card.locator(".fi-news-history")).toContainText(
+    "Segunda interpretación sintética",
+  );
+  await investigation
+    .getByText("Informes financieros guardados", { exact: false })
+    .click();
+  await investigation.locator(".fi-news-brief > summary").click();
+  await expect(investigation.locator(".fi-news-brief")).toContainText(
+    "Infraestructura (1)",
+  );
+  await investigation
+    .getByText("Cotizaciones de contexto al preparar este informe", {
+      exact: true,
+    })
+    .click();
+  await expect(investigation.locator(".fi-news-brief")).toContainText(
+    "no indica qué se sabía entonces ni demuestra que la noticia causara el movimiento",
+  );
+  await investigation
+    .getByText("Mis notas de investigación", { exact: false })
+    .click();
+  const notebook = investigation.locator(".fi-news-notebook");
+  await expect(
+    notebook.getByRole("heading", { name: archivedOnly.title, exact: true }),
+  ).toBeVisible();
+  await expect(notebook).toContainText(
+    "Razón conservada aunque la noticia ya no aparezca en el feed.",
+  );
+  const archivedNote = notebook
+    .locator(".fi-news-saved-note")
+    .filter({ hasText: archivedOnly.title });
+  await expect(
+    archivedNote.getByRole("link", { name: "Fuente conservada", exact: true }),
+  ).toHaveAttribute("href", archivedOnly.url);
+  expect(posts).toHaveLength(2);
+  expect(posts.every((post) => post.action === "news-review")).toBe(true);
+  expect(providers).toEqual([]);
   expect(errors).toEqual([]);
   expect(
     await page.evaluate(

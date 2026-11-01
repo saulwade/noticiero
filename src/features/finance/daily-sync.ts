@@ -1,3 +1,4 @@
+import { assertFinanceCapacity } from "./capacity";
 import { withAlphaRequest } from "@/features/market/request-budget";
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
@@ -106,12 +107,6 @@ async function finish(
           await tx.execute(sql`SELECT count(*)::int AS n FROM finance_marks`),
         ) as { n: number }[];
         if (count[0].n >= 20000) throw new Error("storage");
-        const bytes = resultRows(
-          await tx.execute(sql`SELECT COALESCE(sum(octet_length(data::text)),0)::bigint AS n FROM (
-          SELECT data FROM finance_marks UNION ALL SELECT data FROM finance_instruments UNION ALL SELECT data FROM finance_movements UNION ALL SELECT data FROM finance_policies UNION ALL SELECT data FROM finance_theses UNION ALL SELECT data FROM finance_decisions UNION ALL SELECT data FROM finance_research UNION ALL SELECT data FROM finance_sync
-        ) archive`),
-        ) as { n: string | number }[];
-        if (Number(bytes[0].n) > 49_000_000) throw new Error("storage");
         const { quote: _quote, ...observation } = reference; // eslint-disable-line @typescript-eslint/no-unused-vars
         const mark: FinanceMark = {
           id,
@@ -161,6 +156,7 @@ async function finish(
       .insert(financeSync)
       .values({ id: state.id, data: next })
       .onConflictDoUpdate({ target: financeSync.id, set: { data: next } });
+    await assertFinanceCapacity(tx);
   });
 }
 async function cachedPrice(
@@ -302,6 +298,19 @@ export function financeSyncFindings(
     })),
   ];
   const result: { id: string; message: string }[] = [];
+  const research = states.find((s) => s.id === "news-research");
+  if (
+    !research ||
+    research.status === "error" ||
+    !research.lastSuccess ||
+    now.getTime() - Date.parse(research.lastSuccess) > 36 * 3600000
+  )
+    result.push({
+      id: "finance-news-research",
+      message:
+        "Finanzas: falta confirmar el informe automático de investigación. Se conservan las fichas anteriores.",
+    });
+
   for (const target of targets) {
     if (target.instrument && !supportsAutomaticPrice(target.instrument))
       continue;

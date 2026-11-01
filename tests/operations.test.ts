@@ -86,6 +86,19 @@ describe("registro operativo", () => {
     ])
       await db.delete(table);
     const captured = new Date().toISOString();
+    await db
+      .insert(schema.financeSync)
+      .values({
+        id: "news-research",
+        data: {
+          id: "news-research",
+          label: "Investigación financiera",
+          provider: "Motor local",
+          status: "ok",
+          message: "Fixture",
+          lastSuccess: captured,
+        },
+      });
     await db.insert(schema.financeSync).values({
       id: "fx:USD/MXN",
       data: {

@@ -7,6 +7,9 @@ import {
 import { gzipSync, gunzipSync } from "node:zlib";
 
 export const backupColumns: Record<string, string[]> = {
+  finance_news_events: ["id", "data"],
+  finance_news_reviews: ["id", "data"],
+  finance_news_briefs: ["id", "data"],
   finance_sync: ["id", "data"],
   finance_instruments: ["id", "data"],
   finance_movements: ["id", "data"],
@@ -61,7 +64,7 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
     data.version !== 1 ||
     !Number.isFinite(Date.parse(data.createdAt)) ||
     !Array.isArray(data.tables) ||
-    ![22, 26, 33, Object.keys(backupColumns).length].includes(
+    ![22, 26, 33, 34, Object.keys(backupColumns).length].includes(
       data.tables.length,
     )
   )
@@ -105,8 +108,10 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
       : data.tables.length === 26
         ? !name.startsWith("finance_")
         : data.tables.length === 33
-          ? name !== "finance_sync"
-          : true,
+          ? name !== "finance_sync" && !name.startsWith("finance_news_")
+          : data.tables.length === 34
+            ? !name.startsWith("finance_news_")
+            : true,
   );
   if (required.some((name) => !names.has(name)))
     throw new Error("Faltan tablas de respaldo.");

@@ -1,3 +1,8 @@
+import type {
+  FinanceNewsEvent,
+  FinanceNewsReview,
+  FinanceNewsBrief,
+} from "@/features/finance/research-types";
 import {
   pgTable,
   text,
@@ -40,6 +45,19 @@ import type {
   CompanyResearch,
   FinanceSyncState,
 } from "@/features/finance/types";
+
+export const financeNewsEvents = pgTable("finance_news_events", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinanceNewsEvent>().notNull(),
+});
+export const financeNewsReviews = pgTable("finance_news_reviews", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinanceNewsReview>().notNull(),
+});
+export const financeNewsBriefs = pgTable("finance_news_briefs", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<FinanceNewsBrief>().notNull(),
+});
 
 export const financeSync = pgTable("finance_sync", {
   id: text("id").primaryKey(),
@@ -187,6 +205,9 @@ export const backupRuns = pgTable("backup_runs", {
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
   ...[
+    "finance_news_events",
+    "finance_news_reviews",
+    "finance_news_briefs",
     "finance_sync",
     "finance_instruments",
     "finance_movements",
