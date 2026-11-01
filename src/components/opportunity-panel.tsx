@@ -20,6 +20,7 @@ export function IdeaCard({
   onNote,
   onValidate,
   compact = false,
+  readOnly = false,
 }: {
   idea: Opportunity;
   stories: Story[];
@@ -28,6 +29,7 @@ export function IdeaCard({
   onNote: (note: string, state: SavedItem["state"]) => void;
   onValidate?: () => void;
   compact?: boolean;
+  readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(!compact);
   const [note, setNote] = useState(saved?.note ?? "");
@@ -121,34 +123,42 @@ export function IdeaCard({
             <FlaskConical size={13} />
             {idea.caveat}
           </p>
-          <div className="idea-notes">
-            <label htmlFor={`note-${idea.id}`}>Tu siguiente paso</label>
-            <textarea
-              id={`note-${idea.id}`}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Una pregunta, un posible cliente, un experimento…"
-              rows={3}
-              maxLength={4000}
-            />
-            <div>
-              <select
-                aria-label="Estado de la idea"
-                value={state}
-                onChange={(e) => setState(e.target.value as SavedItem["state"])}
-              >
-                <option value="explore">Por explorar</option>
-                <option value="validating">Validando</option>
-                <option value="dismissed">Descartada</option>
-              </select>
-              <button
-                className="small-button"
-                onClick={() => onNote(note, state)}
-              >
-                Guardar notas
-              </button>
+          {readOnly ? (
+            saved?.note ? (
+              <p className="idea-caveat">Tu nota guardada: {saved.note}</p>
+            ) : null
+          ) : (
+            <div className="idea-notes">
+              <label htmlFor={`note-${idea.id}`}>Tu siguiente paso</label>
+              <textarea
+                id={`note-${idea.id}`}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Una pregunta, un posible cliente, un experimento…"
+                rows={3}
+                maxLength={4000}
+              />
+              <div>
+                <select
+                  aria-label="Estado de la idea"
+                  value={state}
+                  onChange={(e) =>
+                    setState(e.target.value as SavedItem["state"])
+                  }
+                >
+                  <option value="explore">Por explorar</option>
+                  <option value="validating">Validando</option>
+                  <option value="dismissed">Descartada</option>
+                </select>
+                <button
+                  className="small-button"
+                  onClick={() => onNote(note, state)}
+                >
+                  Guardar notas
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : (
         <button className="idea-expand" onClick={() => setExpanded(true)}>

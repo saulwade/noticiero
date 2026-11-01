@@ -97,6 +97,15 @@ export function OperationsView({
           ) : null}
         </article>
       </div>
+      <p
+        className="research-explanation"
+        aria-label="Estado de la investigación automática"
+      >
+        Investigación automática · último análisis guardado:{" "}
+        {date(data.research?.updatedAt)}. Las señales, palabras clave y reportes
+        se conservan en segundo plano. No necesitas abrir una sección ni
+        rellenar formularios; los revisamos en conversación cuando lo pidas.
+      </p>
       <section className="operations-alerts">
         <h2>
           {ops?.alerts.length ? (

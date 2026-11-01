@@ -30,11 +30,9 @@ import {
 } from "lucide-react";
 import { NewsCard } from "./news-card";
 import { CompanyPanel } from "./company-panel";
-import { IdeaCard, OpportunityPanel } from "./opportunity-panel";
+import { IdeaCard } from "./opportunity-panel";
 import { SettingsView, SourcesView } from "./sources-view";
-import { ResearchWorkspace } from "./research-workspace";
 import { OperationsView } from "./operations-view";
-import { EvidenceWorkspace } from "./evidence-workspace";
 import { FinanceWorkspace } from "./finance-workspace";
 import {
   categories,
@@ -49,17 +47,10 @@ import { storyMatches } from "@/lib/story-identity";
 import { savedArchive } from "@/lib/saved-archive";
 
 type View =
-  | "today"
-  | "saved"
-  | "ideas"
-  | "sources"
-  | "settings"
-  | "operations"
-  | "finance";
+  "today" | "saved" | "sources" | "settings" | "operations" | "finance";
 const navigation = [
   { id: "today" as const, label: "Mi briefing", icon: Newspaper },
   { id: "finance" as const, label: "Mi portafolio", icon: Wallet },
-  { id: "ideas" as const, label: "Oportunidades", icon: Lightbulb },
   { id: "saved" as const, label: "Guardados", icon: Bookmark },
 ];
 const categoryColors: Record<Category, string> = {
@@ -81,7 +72,7 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
   const [category, setCategory] = useState<Category | "Todas">("Todas");
   const [selectedId, setSelectedId] = useState<string>();
   const [slot, setSlot] = useState("latest");
-  const [mobileTab, setMobileTab] = useState("news");
+  const [mobileTab, setMobileTab] = useState<"news" | "market">("news");
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [requesting, setRequesting] = useState(false);
@@ -458,8 +449,6 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
               <span>{item.label}</span>
               {item.id === "saved" && savedCount > 0 ? (
                 <span className="nav-count">{savedCount}</span>
-              ) : item.id === "ideas" && data.opportunities.length ? (
-                <span className="nav-count">{data.opportunities.length}</span>
               ) : null}
             </button>
           ))}
@@ -607,12 +596,6 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                         <br />
                         <em>merece una segunda lectura.</em>
                       </>
-                    ) : view === "ideas" ? (
-                      <>
-                        Las señales están ahí.
-                        <br />
-                        <em>¿Qué vas a construir?</em>
-                      </>
                     ) : (
                       <>
                         El mundo se mueve.
@@ -624,9 +607,7 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                   <p>
                     {view === "saved"
                       ? "Tu colección de historias e ideas que vale la pena retomar."
-                      : view === "ideas"
-                        ? "Problemas concretos, hipótesis pequeñas y un siguiente paso."
-                        : "Tecnología, finanzas y oportunidades. Todo lo que importa, sin el ruido."}
+                      : "Tecnología, finanzas y oportunidades. Todo lo que importa, sin el ruido."}
                   </p>
                 </div>
                 <div className="heading-decoration" aria-hidden="true">
@@ -730,9 +711,6 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                         ? "Fuentes ilustrativas"
                         : `${connectedSources} fuentes consultadas`}
                     </span>
-                    <span>
-                      {data.opportunities.length} oportunidades para explorar
-                    </span>
                   </div>
                 </section>
               ) : null}
@@ -740,28 +718,16 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                 <div className="content-label">
                   <span className="section-dot" />
                   <h2>
-                    {view === "ideas"
-                      ? "Del radar al producto"
-                      : view === "saved"
-                        ? "Para volver con calma"
-                        : "En tu radar"}
+                    {view === "saved" ? "Para volver con calma" : "En tu radar"}
                   </h2>
-                  <span className="count-pill">
-                    {view === "ideas"
-                      ? filteredIdeas.length
-                      : visibleStories.length}
-                  </span>
+                  <span className="count-pill">{visibleStories.length}</span>
                 </div>
                 <div className="search-box">
                   <Search size={14} />
                   <input
                     ref={searchInput}
                     aria-label="Buscar noticias, empresas o ideas"
-                    placeholder={
-                      view === "ideas"
-                        ? "Buscar oportunidades…"
-                        : "Buscar una señal…"
-                    }
+                    placeholder="Buscar una señal…"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />
@@ -786,299 +752,179 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                   permanecen hasta que los quites.
                 </p>
               ) : null}
-              {view !== "ideas" ? (
-                <div className="filter-toolbar">
-                  <div
-                    className="category-filters"
-                    role="group"
-                    aria-label="Filtrar por tema"
-                  >
-                    {["Todas", ...categories].map((topic) => (
-                      <button
-                        key={topic}
-                        className={category === topic ? "active" : ""}
-                        onClick={() => setCategory(topic as Category | "Todas")}
-                      >
-                        {topic === "Todas" ? "Todo" : topic}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="edition-select">
-                    <SlidersHorizontal size={13} />
-                    <select
-                      aria-label="Filtrar por edición"
-                      value={slot}
-                      onChange={(event) => setSlot(event.target.value)}
+              <div className="filter-toolbar">
+                <div
+                  className="category-filters"
+                  role="group"
+                  aria-label="Filtrar por tema"
+                >
+                  {["Todas", ...categories].map((topic) => (
+                    <button
+                      key={topic}
+                      className={category === topic ? "active" : ""}
+                      onClick={() => setCategory(topic as Category | "Todas")}
                     >
-                      <option value="latest">Más relevantes</option>
-                      <option value="AM">Edición AM</option>
-                      <option value="PM">Edición PM</option>
-                    </select>
-                    <ChevronDown size={11} />
-                  </div>
+                      {topic === "Todas" ? "Todo" : topic}
+                    </button>
+                  ))}
                 </div>
-              ) : null}
-              {view === "ideas" ? (
-                <>
-                  <ResearchWorkspace
-                    data={data}
-                    query={query}
-                    onNote={(id, note, state) =>
-                      void saveNote(id, note, state, "note")
-                    }
-                    onReport={async () => {
-                      try {
-                        const response = await fetch("/api/research/report", {
-                          method: "POST",
-                        });
-                        if (!response.ok) throw new Error("report");
-                        await reload();
-                        setToast("Reporte guardado en oportunidades.");
-                      } catch {
-                        setToast(
-                          "No se pudo generar el reporte. Intenta de nuevo.",
-                        );
-                      }
-                    }}
+                <div className="edition-select">
+                  <SlidersHorizontal size={13} />
+                  <select
+                    aria-label="Filtrar por edición"
+                    value={slot}
+                    onChange={(event) => setSlot(event.target.value)}
                   >
-                    <div className="ideas-library">
-                      {filteredIdeas.length ? (
-                        filteredIdeas.map((idea) => (
+                    <option value="latest">Más relevantes</option>
+                    <option value="AM">Edición AM</option>
+                    <option value="PM">Edición PM</option>
+                  </select>
+                  <ChevronDown size={11} />
+                </div>
+              </div>
+              <>
+                <div
+                  className="mobile-context-tabs"
+                  role="group"
+                  aria-label="Secciones del dashboard"
+                >
+                  <button
+                    className={mobileTab === "news" ? "active" : ""}
+                    onClick={() => setMobileTab("news")}
+                  >
+                    <Newspaper size={14} />
+                    Noticias
+                  </button>
+                  <button
+                    className={mobileTab === "market" ? "active" : ""}
+                    onClick={() => setMobileTab("market")}
+                  >
+                    <Compass size={14} />
+                    Empresas
+                  </button>
+                </div>
+                <div className={`dashboard-columns mobile-tab-${mobileTab}`}>
+                  <div className="news-column">
+                    {selected ? (
+                      <div className="selected-notice">
+                        <span>
+                          <span className="status-dot" />
+                          Contexto de la historia seleccionada
+                        </span>
+                        <button onClick={() => setSelectedId(undefined)}>
+                          Ver todo
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : null}
+                    {visibleStories.length ? (
+                      <div className="news-feed">
+                        {visibleStories.map((story, index) => (
+                          <div id={`story-${story.id}`} key={story.id}>
+                            <NewsCard
+                              story={story}
+                              featured={
+                                index === 0 && category === "Todas" && !query
+                              }
+                              selected={selectedId === story.id}
+                              saved={data.saved.some((s) =>
+                                storyMatches(story, s.id),
+                              )}
+                              read={data.readIds.some((id) =>
+                                storyMatches(story, id),
+                              )}
+                              onSelect={() => select(story)}
+                              onSave={() => void toggleSave(story.id, "story")}
+                            />
+                          </div>
+                        ))}
+                        <div className="feed-end">
+                          <CheckCheck size={17} strokeWidth={1.2} />
+                          <p>
+                            Un poco más de contexto.
+                            <br />
+                            <span>Un poco menos de ruido.</span>
+                          </p>
+                          <span className="feed-end-line" />
+                        </div>
+                      </div>
+                    ) : view === "saved" && filteredIdeas.length ? null : (
+                      <EmptyState
+                        icon={view === "saved" ? "saved" : "news"}
+                        title={
+                          running
+                            ? "Preparando tu primera edición"
+                            : query || category !== "Todas"
+                              ? "No encontramos esa señal"
+                              : view === "saved"
+                                ? "Dale un lugar a tus hallazgos"
+                                : "Tu radar está listo para empezar"
+                        }
+                        description={
+                          running
+                            ? "Estamos consultando tus fuentes. Las noticias aparecerán aquí al terminar."
+                            : query || category !== "Todas"
+                              ? "Prueba con otro tema o una búsqueda diferente."
+                              : view === "saved"
+                                ? "Guarda una noticia con el marcador y vuelve a ella cuando tengas tiempo."
+                                : "Actualiza para traer noticias reales de tecnología. También puedes recorrer una vista de ejemplo."
+                        }
+                        action={
+                          running
+                            ? undefined
+                            : query || category !== "Todas"
+                              ? "Quitar filtros"
+                              : view === "saved"
+                                ? "Explorar noticias"
+                                : "Consultar fuentes"
+                        }
+                        onAction={() => {
+                          if (query || category !== "Todas") {
+                            setQuery("");
+                            setCategory("Todas");
+                          } else if (view === "saved") navigate("today");
+                          else void update();
+                        }}
+                      />
+                    )}
+                    {view === "saved" && filteredIdeas.length ? (
+                      <section className="saved-ideas">
+                        <h2>
+                          <Lightbulb size={17} />
+                          Ideas que guardaste
+                        </h2>
+                        {filteredIdeas.map((idea) => (
                           <IdeaCard
                             key={idea.id}
                             idea={idea}
                             stories={data.stories}
                             saved={data.saved.find((s) => s.id === idea.id)}
+                            readOnly
                             onSave={() => void toggleSave(idea.id, "idea")}
                             onNote={(note, state) =>
                               void saveNote(idea.id, note, state)
                             }
                           />
-                        ))
-                      ) : (
-                        <EmptyState
-                          icon="ideas"
-                          title={
-                            query
-                              ? "Todavía no hay una coincidencia"
-                              : "Las buenas ideas empiezan con una señal"
-                          }
-                          description={
-                            query
-                              ? "Intenta con otra palabra o limpia tu búsqueda."
-                              : "El motor busca solicitudes y fricción en fuentes públicas. Las señales aisladas se guardan en el cuaderno; las hipótesis requieren repetición de varios autores."
-                          }
-                          action={
-                            query ? "Limpiar búsqueda" : "Ver mis fuentes"
-                          }
-                          onAction={() =>
-                            query ? setQuery("") : navigate("sources")
-                          }
-                        />
-                      )}
-                    </div>
-                  </ResearchWorkspace>
-                  <details className="opportunity-secondary">
-                    <summary>
-                      Radar de problemas · evidencia y cobertura{" "}
-                      <ChevronRight size={14} />
-                    </summary>
-                    <EvidenceWorkspace
-                      data={
-                        data.evidence ?? {
-                          records: [],
-                          reviews: [],
-                          dossiers: [],
-                          sources: [],
-                          reports: [],
-                          totalRecords: 0,
-                          storageLimited: false,
-                        }
-                      }
-                      demo={data.demo}
-                      onRefresh={reload}
-                    />
-                  </details>
-                </>
-              ) : (
-                <>
-                  <div
-                    className="mobile-context-tabs"
-                    role="group"
-                    aria-label="Secciones del dashboard"
+                        ))}
+                      </section>
+                    ) : null}
+                  </div>
+                  <aside
+                    className="context-column"
+                    aria-label="Contexto de empresas"
                   >
-                    <button
-                      className={mobileTab === "news" ? "active" : ""}
-                      onClick={() => setMobileTab("news")}
-                    >
-                      <Newspaper size={14} />
-                      Noticias
-                    </button>
-                    <button
-                      className={mobileTab === "market" ? "active" : ""}
-                      onClick={() => setMobileTab("market")}
-                    >
-                      <Compass size={14} />
-                      Empresas
-                    </button>
-                    <button
-                      className={mobileTab === "ideas" ? "active" : ""}
-                      onClick={() => setMobileTab("ideas")}
-                    >
-                      <Lightbulb size={14} />
-                      Ideas
-                    </button>
-                  </div>
-                  <div className={`dashboard-columns mobile-tab-${mobileTab}`}>
-                    <div className="news-column">
-                      {selected ? (
-                        <div className="selected-notice">
-                          <span>
-                            <span className="status-dot" />
-                            Contexto de la historia seleccionada
-                          </span>
-                          <button onClick={() => setSelectedId(undefined)}>
-                            Ver todo
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ) : null}
-                      {visibleStories.length ? (
-                        <div className="news-feed">
-                          {visibleStories.map((story, index) => (
-                            <div id={`story-${story.id}`} key={story.id}>
-                              <NewsCard
-                                story={story}
-                                featured={
-                                  index === 0 && category === "Todas" && !query
-                                }
-                                selected={selectedId === story.id}
-                                saved={data.saved.some((s) =>
-                                  storyMatches(story, s.id),
-                                )}
-                                read={data.readIds.some((id) =>
-                                  storyMatches(story, id),
-                                )}
-                                onSelect={() => select(story)}
-                                onSave={() =>
-                                  void toggleSave(story.id, "story")
-                                }
-                              />
-                            </div>
-                          ))}
-                          <div className="feed-end">
-                            <CheckCheck size={17} strokeWidth={1.2} />
-                            <p>
-                              Un poco más de contexto.
-                              <br />
-                              <span>Un poco menos de ruido.</span>
-                            </p>
-                            <span className="feed-end-line" />
-                          </div>
-                        </div>
-                      ) : view === "saved" && filteredIdeas.length ? null : (
-                        <EmptyState
-                          icon={view === "saved" ? "saved" : "news"}
-                          title={
-                            running
-                              ? "Preparando tu primera edición"
-                              : query || category !== "Todas"
-                                ? "No encontramos esa señal"
-                                : view === "saved"
-                                  ? "Dale un lugar a tus hallazgos"
-                                  : "Tu radar está listo para empezar"
-                          }
-                          description={
-                            running
-                              ? "Estamos consultando tus fuentes. Las noticias aparecerán aquí al terminar."
-                              : query || category !== "Todas"
-                                ? "Prueba con otro tema o una búsqueda diferente."
-                                : view === "saved"
-                                  ? "Guarda una noticia con el marcador y vuelve a ella cuando tengas tiempo."
-                                  : "Actualiza para traer noticias reales de tecnología. También puedes recorrer una vista de ejemplo."
-                          }
-                          action={
-                            running
-                              ? undefined
-                              : query || category !== "Todas"
-                                ? "Quitar filtros"
-                                : view === "saved"
-                                  ? "Explorar noticias"
-                                  : "Consultar fuentes"
-                          }
-                          onAction={() => {
-                            if (query || category !== "Todas") {
-                              setQuery("");
-                              setCategory("Todas");
-                            } else if (view === "saved") navigate("today");
-                            else void update();
-                          }}
-                        />
-                      )}
-                      {view === "saved" && filteredIdeas.length ? (
-                        <section className="saved-ideas">
-                          <h2>
-                            <Lightbulb size={17} />
-                            Ideas que guardaste
-                          </h2>
-                          {filteredIdeas.map((idea) => (
-                            <IdeaCard
-                              key={idea.id}
-                              idea={idea}
-                              stories={data.stories}
-                              saved={data.saved.find((s) => s.id === idea.id)}
-                              onSave={() => void toggleSave(idea.id, "idea")}
-                              onNote={(note, state) =>
-                                void saveNote(idea.id, note, state)
-                              }
-                            />
-                          ))}
-                        </section>
-                      ) : null}
+                    <div className="market-tab-panel">
+                      <CompanyPanel
+                        stories={visibleStories}
+                        quotes={data.quotes}
+                        selected={selected}
+                        configured={data.configuration.market}
+                        onConfigure={() => navigate("settings")}
+                      />
                     </div>
-                    <aside
-                      className="context-column"
-                      aria-label="Contexto y oportunidades"
-                    >
-                      <div className="market-tab-panel">
-                        <CompanyPanel
-                          stories={visibleStories}
-                          quotes={data.quotes}
-                          selected={selected}
-                          configured={data.configuration.market}
-                          onConfigure={() => navigate("settings")}
-                        />
-                      </div>
-                      <div className="ideas-tab-panel">
-                        <OpportunityPanel
-                          ideas={data.opportunities}
-                          stories={data.stories}
-                          saved={data.saved}
-                          selected={selected}
-                          configured={
-                            data.configuration.analysisMode !== "api" ||
-                            data.configuration.ai
-                          }
-                          onConfigure={() => navigate("settings")}
-                          onSave={(id) => void toggleSave(id, "idea")}
-                          onNote={(id, note, state) =>
-                            void saveNote(id, note, state)
-                          }
-                          onViewAll={() => navigate("ideas")}
-                        />
-                      </div>
-                      <div className="reading-note">
-                        <span>UNA BUENA PREGUNTA PARA HOY</span>
-                        <p>
-                          ¿Qué problema se está volviendo más importante… y
-                          quién sigue resolviéndolo a mano?
-                        </p>
-                        <span className="note-doodle">↗</span>
-                      </div>
-                    </aside>
-                  </div>
-                </>
-              )}
+                  </aside>
+                </div>
+              </>
             </>
           )}
           <footer className="main-footer">

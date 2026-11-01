@@ -1,215 +1,100 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import type { EvidenceData } from "../../src/features/evidence/types";
 
-async function openRadar(page: Page, isMobile: boolean) {
-  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: /^Oportunidades/ }).click();
-  await page
-    .getByText("Radar de problemas · evidencia y cobertura", { exact: true })
-    .click();
-  await expect(
-    page.getByRole("region", { name: "Radar de evidencia" }),
-  ).toBeVisible();
-}
-
-test("radar vacío, filtros, cobertura y exportación en escritorio y teléfono", async ({
+test("evidencia y reportes disponibles sin una pantalla de investigación", async ({
   page,
   isMobile,
 }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/?demo=1");
-  await openRadar(page, isMobile);
+  await page.goto("/");
+  const evidence = await page.request.get("/api/evidence");
+  expect(evidence.ok()).toBe(true);
+  const before: EvidenceData = await evidence.json();
+  expect(Array.isArray(before.records)).toBe(true);
+  const exported = await page.request.get("/api/evidence/export");
+  expect(exported.ok()).toBe(true);
+  expect(exported.headers()["content-type"]).toContain("text/markdown");
+  const report = await page.request.get("/api/research/brief?days=3");
+  expect(report.ok()).toBe(true);
+  expect(await report.text()).toContain("Noticiero · investigación de");
   await expect(
-    page.getByRole("region", { name: "Prioridades de investigación" }),
-  ).toContainText("Qué vale la pena entender.");
-  const radar = page.getByRole("region", { name: "Radar de evidencia" });
-  await expect(radar.getByRole("heading", { level: 1 })).toContainText(
-    "Problemas reales.",
-  );
+    page.locator(
+      ".evidence-workspace,.research-workspace,.idea-notes,.ideas-tab-panel",
+    ),
+  ).toHaveCount(0);
+  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
   await expect(
-    radar.getByRole("heading", { name: "La evidencia viene primero." }),
-  ).toBeVisible();
-  await radar
-    .getByLabel("Buscar problema o cita")
-    .fill("Sin coincidencia de prueba");
-  await radar.getByLabel("País sustentado").selectOption("unknown");
-  await radar.getByLabel("Idioma", { exact: true }).selectOption("es");
-  await radar.getByLabel("Tipo", { exact: true }).selectOption("complaint");
-  await expect(
-    radar.getByRole("heading", {
-      name: "Sin coincidencias con estos filtros.",
+    page.getByRole("button", {
+      name: /Oportunidades|Importar CSV|Generar reporte de hoy/,
     }),
-  ).toBeVisible();
-  await radar.getByRole("button", { name: "Limpiar filtros" }).click();
-  await expect(radar.getByLabel("Buscar problema o cita")).toHaveValue("");
-  await radar
-    .getByText("Cobertura y estado de las fuentes", { exact: true })
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Estado y respaldos", exact: true })
     .click();
   await expect(
-    radar.getByText("Aún no hay comprobaciones de fuentes."),
-  ).toBeVisible();
-  await radar
-    .getByText("Importar evidencia de PROFECO", { exact: true })
-    .click();
-  await expect(
-    radar.getByLabel("Archivo CSV oficial de PROFECO"),
-  ).toBeDisabled();
-  await expect(
-    radar.getByRole("button", { name: "Importar CSV", exact: true }),
-  ).toBeDisabled();
-  const downloadPromise = page.waitForEvent("download");
-  await radar
-    .getByRole("button", { name: "Exportar investigación", exact: true })
-    .click();
-  const file = await downloadPromise;
-  expect(file.suggestedFilename()).toBe("noticiero-evidencia.md");
-  await expect(radar.getByRole("status")).toContainText(
-    "Investigación descargada",
-  );
-  await radar.getByRole("button", { name: /Balances semanales/ }).click();
-  await expect(
-    radar.getByText("El primer balance aparecerá después del cierre semanal.", {
-      exact: false,
-    }),
-  ).toBeVisible();
+    page.getByLabel("Estado de la investigación automática"),
+  ).toContainText("se conservan en segundo plano");
+  const after: EvidenceData = await (
+    await page.request.get("/api/evidence")
+  ).json();
+  expect(after.totalRecords).toBeGreaterThanOrEqual(before.totalRecords);
+  const afterIds = new Set(after.records.map((record) => record.id));
+  expect(before.records.every((record) => afterIds.has(record.id))).toBe(true);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  expect(errors).toEqual([]);
 });
 
-test("CSV explícito y revisión persistente dentro de Oportunidades", async ({
+test("la API conserva evidencia, revisión y exportación al retirar formularios", async ({
   page,
-  isMobile,
 }, testInfo) => {
+  await page.goto("/");
   const marker = `${testInfo.project.name}-${Date.now().toString(36)}`;
-  const provider = `Proveedor evidencia ${marker}`;
+  const provider = `Proveedor de prueba ${marker}`;
   const issue = `No puedo obtener el reembolso ${marker}-uno`;
   const csv = [
     "expediente,fecha_ingreso,proveedor,motivo_reclamacion,giro",
     `${marker}-uno,2026-01-15,${provider},${issue},Servicios`,
     `${marker}-dos,2026-01-16,${provider},No puedo obtener el reembolso ${marker}-dos,Servicios`,
   ].join("\n");
-  const writes: string[] = [];
-  page.on("request", (request) => {
-    if (
-      request.method() === "POST" &&
-      new URL(request.url()).pathname === "/api/evidence"
-    )
-      writes.push(request.postData() ?? "");
+  const headers = { Origin: new URL(page.url()).origin };
+  const imported = await page.request.post("/api/evidence", {
+    headers,
+    data: { action: "import", csv },
   });
-  await page.goto("/");
-  await openRadar(page, isMobile);
-  const radar = page.getByRole("region", { name: "Radar de evidencia" });
-  await radar
-    .getByText("Importar evidencia de PROFECO", { exact: true })
-    .click();
-  await radar.getByLabel("Archivo CSV oficial de PROFECO").setInputFiles({
-    name: `profeco-${marker}.csv`,
-    mimeType: "text/csv",
-    buffer: Buffer.from(csv),
+  expect(imported.ok()).toBe(true);
+  expect((await imported.json()).added).toBe(2);
+  const repeat = await page.request.post("/api/evidence", {
+    headers,
+    data: { action: "import", csv },
   });
-  await expect(
-    radar.getByText(
-      `Listo para validar: profeco-${marker}.csv. Aún no se ha enviado.`,
-    ),
-  ).toBeVisible();
-  expect(writes).toEqual([]);
-  await radar
-    .getByRole("button", { name: "Importar CSV", exact: true })
-    .click();
-  await expect(radar.getByRole("status")).toContainText(
-    /2 registros nuevos importados/,
-  );
-  const priorities = page.getByRole("region", {
-    name: "Prioridades de investigación",
+  expect((await repeat.json()).added).toBe(0);
+  const data: EvidenceData = await (
+    await page.request.get("/api/evidence")
+  ).json();
+  const record = data.records.find((r) => r.issue === issue)!;
+  expect(record).toMatchObject({
+    country: "MX",
+    kind: "complaint",
+    product: provider,
   });
-  await expect(priorities).toContainText("México:");
-  await expect(priorities).toContainText("Repetición histórica");
-  const globalSearch = page.getByRole("textbox", {
-    name: "Buscar noticias, empresas o ideas",
+  const note = `Comprobar el proceso ${marker}`;
+  const reviewed = await page.request.post("/api/evidence", {
+    headers,
+    data: { action: "review", id: record.id, decision: "useful", note },
   });
-  await globalSearch.fill(provider);
-  await expect(priorities).toContainText(provider);
-  await globalSearch.fill(`no-selected-problem-${marker}`);
-  await expect(priorities).toContainText(
-    "No hay problemas seleccionados que coincidan con esta búsqueda.",
-  );
-  await expect(priorities.locator(".op-lead")).toHaveCount(0);
-  await globalSearch.fill("");
-  expect(writes).toHaveLength(1);
-  expect(JSON.parse(writes[0]).action).toBe("import");
-
-  await radar.getByRole("button", { name: /^Evidencia/ }).click();
-  await radar.getByLabel("Buscar problema o cita").fill(issue);
-  await radar.getByLabel("País sustentado").selectOption("MX");
-  await radar.getByLabel("Idioma", { exact: true }).selectOption("es");
-  await radar.getByLabel("Tipo", { exact: true }).selectOption("complaint");
-  const record = radar.locator(".ev-record").filter({ hasText: issue });
-  await expect(record).toHaveCount(1);
-  await expect(record).toContainText("Caso sin identidad pública");
-  await expect(record).toContainText(
-    "Registro administrativo, sin narrativa personal",
-  );
-  await record.getByText("Revisar esta evidencia", { exact: true }).click();
-  await record
-    .getByLabel("Clasificación", { exact: true })
-    .selectOption("useful");
-  const note = `Comprobar la demora y el proceso actual ${marker}`;
-  await record.getByLabel("Nota de revisión", { exact: true }).fill(note);
-  await record
-    .getByRole("button", { name: "Guardar revisión", exact: true })
-    .click();
-  await expect(radar.getByRole("status")).toContainText("Revisión guardada");
-
+  expect(reviewed.ok()).toBe(true);
   await page.reload();
-  await openRadar(page, isMobile);
-  await radar.getByRole("button", { name: /^Evidencia/ }).click();
-  await radar.getByLabel("Buscar problema o cita").fill(issue);
-  const savedRecord = radar.locator(".ev-record").filter({ hasText: issue });
-  await savedRecord.locator(".ev-review > summary").click();
   await expect(
-    savedRecord.getByLabel("Nota de revisión", { exact: true }),
-  ).toHaveValue(note);
-  await expect(savedRecord.locator(".ev-saved-note")).toContainText(note);
-
-  await radar.getByRole("button", { name: /^Problemas/ }).click();
-  const dossier = radar.locator(".ev-dossier").filter({ hasText: provider });
-  await expect(dossier).toHaveCount(1);
-  await dossier.locator(":scope > summary").click();
-  await expect(dossier).toContainText(
-    "0 autores identificados · 2 casos anónimos",
-  );
-  await expect(
-    dossier.getByRole("heading", {
-      name: "Actividad · publicación frente a captura",
-    }),
-  ).toBeVisible();
-  await expect(dossier.locator(".ev-activity")).toContainText(
-    "0 casos publicados",
-  );
-  await expect(dossier.locator(".ev-activity")).toContainText(
-    "2 capturados en el período",
-  );
-  await expect(
-    dossier.getByRole("heading", { name: "Contradicciones y límites" }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await expect(
-    dossier.getByRole("button", { name: "Llevar a Entrevistas" }),
+    page.locator(".evidence-workspace,.research-workspace,.idea-notes"),
   ).toHaveCount(0);
-  expect(writes.every((write) => JSON.parse(write).action !== "project")).toBe(
-    true,
-  );
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  const after: EvidenceData = await (
+    await page.request.get("/api/evidence")
+  ).json();
+  expect(after.records.some((r) => r.id === record.id)).toBe(true);
+  expect(after.reviews.find((r) => r.id === record.id)?.note).toBe(note);
+  const exported = await page.request.get("/api/evidence/export");
+  expect(exported.ok()).toBe(true);
+  expect(await exported.text()).toContain(issue);
 });

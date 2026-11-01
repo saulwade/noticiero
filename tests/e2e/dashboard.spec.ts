@@ -38,24 +38,39 @@ test("briefing, búsqueda, contexto y guardados", async ({ page, isMobile }) => 
   expect(errors).toEqual([]);
 });
 
-test("ideas guardables, experimento y notas", async ({ page, isMobile }) => {
+test("investigación automática fuera de la interfaz diaria", async ({
+  page,
+  isMobile,
+}) => {
   await page.goto("/?demo=1");
+  await expect(
+    page.locator(
+      ".research-workspace,.evidence-workspace,.ideas-tab-panel,.idea-notes",
+    ),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Ideas", exact: true }),
+  ).toHaveCount(0);
   if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: /^Oportunidades/ }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Qué vas a construir",
-  );
-  await expect(page.getByText("Cómo validarla", { exact: true })).toBeVisible();
-  await page.getByLabel("Tu siguiente paso").fill("Probar un piloto pequeño.");
-  await page.getByLabel("Estado de la idea").selectOption("validating");
-  await page.getByRole("button", { name: "Guardar notas" }).click();
-  await expect(page.getByRole("status")).toHaveText(/Notas guardadas/);
-  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: /^Guardados/ }).click();
-  await expect(page.locator(".saved-ideas .idea-card")).toHaveCount(1);
-  await expect(page.getByLabel("Tu siguiente paso")).toHaveValue(
-    "Probar un piloto pequeño.",
-  );
+  await expect(
+    page
+      .getByRole("navigation", { name: "Navegación principal" })
+      .getByRole("button", { name: /Oportunidades|Radar|Entrevistas/ }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Estado y respaldos", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Estado de la investigación automática"),
+  ).toContainText("se conservan en segundo plano");
+  await expect(
+    page.getByLabel("Estado de la investigación automática"),
+  ).toContainText("No necesitas abrir una sección");
+  await expect(
+    page.getByRole("button", {
+      name: /Generar reporte|Guardar notas|Importar CSV/,
+    }),
+  ).toHaveCount(0);
 });
 
 test("fuentes configurables y configuración sin secretos", async ({
@@ -115,36 +130,22 @@ test("las fotografías ocupan una fila ancha sin dejar un hueco sobre el título
   expect(geometry.gap).toBeLessThan(30);
 });
 
-test("el cuaderno conserva notas al cambiar de sección y explica el reporte nocturno", async ({
+test("los reportes siguen disponibles por API sin abrir un cuaderno", async ({
   page,
-  isMobile,
 }) => {
-  await page.goto("/?demo=1");
-  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: /^Oportunidades/ }).click();
-  await page.getByRole("button", { name: /Cuaderno de señales/ }).click();
-  await expect(page.locator(".signal-evidence")).toContainText(
-    "Señal ficticia de demostración",
-  );
-  await page
-    .getByLabel("Tus notas y siguientes preguntas")
-    .fill("Comprobar el flujo actual antes de construir.");
-  await page.getByRole("button", { name: "Guardar nota", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Notas guardadas");
-  await page.getByRole("button", { name: /Reportes nocturnos/ }).click();
-  await expect(
-    page.getByRole("button", { name: "Generar reporte de hoy" }),
-  ).toBeDisabled();
-  await expect(page.locator(".nightly-reports")).toContainText("20:00 CDMX");
-  await page.getByRole("button", { name: /Cuaderno de señales/ }).click();
-  await expect(page.getByLabel("Tus notas y siguientes preguntas")).toHaveValue(
-    "Comprobar el flujo actual antes de construir.",
-  );
+  await page.goto("/");
+  const response = await page.request.get("/api/research/brief?days=7");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toContain("text/markdown");
+  expect(await response.text()).toContain("Noticiero · investigación de");
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+    (await page.request.get("/api/research/brief?days=999")).status(),
+  ).toBe(400);
+  await expect(
+    page.getByRole("button", {
+      name: /Cuaderno de señales|Reportes nocturnos|Archivo automático/,
+    }),
+  ).toHaveCount(0);
 });
 
 test("las APIs rechazan escrituras externas y cron sin secreto", async ({
@@ -185,27 +186,26 @@ test("las APIs rechazan escrituras externas y cron sin secreto", async ({
   );
 });
 
-test("archivo automático y categorías de finanzas y operaciones", async ({
-  page,
-  isMobile,
-}) => {
+test("estado discreto y categorías conservadas", async ({ page, isMobile }) => {
   await page.goto("/?demo=1");
   if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: /^Oportunidades/ }).click();
-  await page.getByRole("button", { name: /Archivo automático/ }).click();
   await expect(
-    page.getByText("Este archivo se llena solo", { exact: false }),
-  ).toBeVisible();
-  await page.getByLabel("Periodo del archivo automático").selectOption("7");
-  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await expect(
-    page.getByRole("button", { name: "Finanzas", exact: true }),
+    page
+      .locator(".sidebar")
+      .getByRole("button", { name: "Finanzas", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Operaciones", exact: true }),
+    page
+      .locator(".sidebar")
+      .getByRole("button", { name: "Operaciones", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /^Estado y respaldos/ }).click();
+  await page
+    .getByRole("button", { name: "Estado y respaldos", exact: true })
+    .click();
   await expect(page.locator(".operations-view")).toContainText("siete días");
+  await expect(
+    page.getByLabel("Estado de la investigación automática"),
+  ).toContainText("último análisis guardado");
   await expect(
     page.getByRole("button", { name: "Actualizar estado", exact: true }),
   ).toBeDisabled();
@@ -218,7 +218,6 @@ test("archivo automático y categorías de finanzas y operaciones", async ({
 
 test("investigaciones conservadas por API sin formularios ni acceso de entrevistas", async ({
   page,
-  isMobile,
 }, testInfo) => {
   await page.goto("/");
   const marker = `${testInfo.project.name}-${Date.now().toString(36)}`;
@@ -267,28 +266,14 @@ test("investigaciones conservadas por API sin formularios ni acceso de entrevist
   });
 
   await page.reload();
-  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: /^Oportunidades/ }).click();
   await expect(
-    page.locator(".validation-workspace, .interview-form"),
-  ).toHaveCount(0);
-  await expect(
-    page.getByText("Archivo de investigaciones anteriores", { exact: true }),
+    page.locator(
+      ".validation-workspace,.interview-form,.research-workspace,.evidence-workspace",
+    ),
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", {
-      name: /Entrevistas|Nueva investigación|Abrir archivo de investigaciones|Preparar entrevistas|Añadir entrevista/,
-    }),
-  ).toHaveCount(0);
-  await page
-    .getByText("Radar de problemas · evidencia y cobertura", { exact: true })
-    .click();
-  await expect(
-    page.getByRole("region", { name: "Radar de evidencia" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", {
-      name: /Llevar a Entrevistas|Preparar entrevistas/,
+      name: /Preparar entrevistas|Llevar a Entrevistas|Añadir entrevista/,
     }),
   ).toHaveCount(0);
   const afterResponse = await page.request.get("/api/validation");
@@ -305,7 +290,7 @@ test("investigaciones conservadas por API sin formularios ni acceso de entrevist
   ).toBe(true);
 });
 
-test("navegación con cuatro destinos y Radar secundario", async ({
+test("tres destinos y ninguna pantalla de tareas de investigación", async ({
   page,
   isMobile,
 }) => {
@@ -314,40 +299,19 @@ test("navegación con cuatro destinos y Radar secundario", async ({
   const navigation = page.getByRole("navigation", {
     name: "Navegación principal",
   });
-  await expect(navigation.getByRole("button")).toHaveCount(4);
-  for (const name of [
-    "Mi briefing",
-    "Mi portafolio",
-    "Oportunidades",
-    "Guardados",
-  ])
+  await expect(navigation.getByRole("button")).toHaveCount(3);
+  for (const name of ["Mi briefing", "Mi portafolio", "Guardados"])
     await expect(
       navigation.getByRole("button", { name: new RegExp(`^${name}`) }),
     ).toBeVisible();
   await expect(
-    navigation.getByRole("button", { name: /Entrevistas|Radar/ }),
-  ).toHaveCount(0);
-  await navigation.getByRole("button", { name: /^Oportunidades/ }).click();
-  await expect(
-    page.getByText("Archivo de investigaciones anteriores", { exact: true }),
+    navigation.getByRole("button", { name: /Oportunidades|Radar|Entrevistas/ }),
   ).toHaveCount(0);
   await expect(
-    page.locator(".validation-workspace, .interview-form"),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("region", { name: "Radar de evidencia" }),
-  ).not.toBeVisible();
-  await expect(
-    page.getByRole("button", {
-      name: /Preparar entrevistas|Llevar a Entrevistas/,
+    page.getByRole("region", {
+      name: /Radar de evidencia|Prioridades de investigación/,
     }),
   ).toHaveCount(0);
-  await page
-    .getByText("Radar de problemas · evidencia y cobertura", { exact: true })
-    .click();
-  await expect(
-    page.getByRole("region", { name: "Radar de evidencia" }),
-  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
