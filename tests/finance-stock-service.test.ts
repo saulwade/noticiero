@@ -62,11 +62,50 @@ function providers(): StockProviders {
 }
 beforeEach(async () => {
   const db = await getDb();
+  await db.delete(t.usage);
   for (const table of [t.financeResearch, t.financeHistories, t.financeSync])
     await db.delete(table);
   vi.mocked(assertFinanceCapacity).mockReset().mockResolvedValue(undefined);
 });
 describe("preparación automática acotada de acciones", () => {
+  it("cuota agotada deja datos pendientes hasta el siguiente día UTC sin falsa avería", async () => {
+    const db = await getDb(),
+      source = providers();
+    await db.insert(t.usage).values({ key: "quote:2026-11-01", amount: 20 });
+    vi.mocked(source.facts).mockRejectedValue(new Error("quota"));
+    vi.mocked(source.history).mockRejectedValue(new Error("quota"));
+    const events = [event("Astera Labs reports revenue")];
+    const first = await prepareStockContext(events, now, source);
+    expect(first.warnings.join(" ")).toContain(
+      "Cuota gratuita compartida en pausa",
+    );
+    expect(
+      (await db.select().from(t.financeSync)).every(
+        (row) => row.data.status === "configuration",
+      ),
+    ).toBe(true);
+    const later = new Date(now.getTime() + 60000),
+      retry = await prepareStockContext(events, later, source);
+    expect(source.facts).toHaveBeenCalledTimes(1);
+    expect(source.history).toHaveBeenCalledTimes(1);
+    expect(
+      automationInputHash({
+        asOf: now.toISOString(),
+        stockResearch: first,
+      } as AutomationInput),
+    ).toBe(
+      automationInputHash({
+        asOf: later.toISOString(),
+        stockResearch: retry,
+      } as AutomationInput),
+    );
+    await prepareStockContext(
+      events,
+      new Date(now.getTime() + 86400000),
+      source,
+    );
+    expect(source.facts).toHaveBeenCalledTimes(2);
+  });
   it("consulta por lotes, conserva evidencia y no crea instrumentos ni operaciones", async () => {
     const db = await getDb(),
       beforeInstruments = await db.select().from(t.financeInstruments),
@@ -104,19 +143,17 @@ describe("preparación automática acotada de acciones", () => {
     const db = await getDb(),
       source = providers(),
       old = "2026-10-01T00:00:00Z";
-    await db
-      .insert(t.financeResearch)
-      .values({
+    await db.insert(t.financeResearch).values({
+      id: "facts:ALAB",
+      data: {
         id: "facts:ALAB",
-        data: {
-          id: "facts:ALAB",
-          instrumentId: "research-issuer:0001736297",
-          capturedAt: old,
-          source: "Fixture SEC",
-          facts: [],
-          warnings: [],
-        },
-      });
+        instrumentId: "research-issuer:0001736297",
+        capturedAt: old,
+        source: "Fixture SEC",
+        facts: [],
+        warnings: [],
+      },
+    });
     const events = [event("Astera Labs reports revenue")];
     const first = await prepareStockContext(events, now, source),
       later = new Date(now.getTime() + 60000);

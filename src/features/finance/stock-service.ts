@@ -1,6 +1,11 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { financeHistories, financeResearch, financeSync } from "@/db/schema";
+import {
+  financeHistories,
+  financeResearch,
+  financeSync,
+  usage,
+} from "@/db/schema";
 import { assertFinanceCapacity } from "./capacity";
 import { discoverStockCandidates } from "./stock-discovery";
 import { fetchWeeklyHistory } from "./automatic-providers";
@@ -70,6 +75,8 @@ export async function prepareStockContext(
               Date.parse(previous.leaseUntil ?? "") > now.getTime()) ||
             (previous?.status === "error" &&
               now.getTime() - Date.parse(previous.lastAttempt ?? "") < DAY) ||
+            (previous?.status === "configuration" &&
+              previous.session === now.toISOString().slice(0, 10)) ||
             (cached &&
               now.getTime() -
                 Date.parse(previous?.lastSuccess ?? cached.capturedAt) <
@@ -181,22 +188,28 @@ export async function prepareStockContext(
             >;
         }
       } catch {
-        warnings.push(
-          `${candidate.symbol}: ${kind === "facts" ? "fundamentales SEC" : "histórico ajustado"} pendientes; se conserva la evidencia anterior.`,
-        );
         await db.transaction(async (tx) => {
           await tx.execute(lock);
           const state = (
             await tx.select().from(financeSync).where(eq(financeSync.id, id))
           )[0]?.data;
           if (state?.leaseToken !== token) return;
+          const budget = (
+            await tx
+              .select()
+              .from(usage)
+              .where(eq(usage.key, `quote:${now.toISOString().slice(0, 10)}`))
+          )[0];
+          const exhausted = (budget?.amount ?? 0) >= 20;
           const next = {
             ...state,
-            status: "error" as const,
+            status: exhausted ? ("configuration" as const) : ("error" as const),
+            session: exhausted ? now.toISOString().slice(0, 10) : undefined,
             leaseToken: undefined,
             leaseUntil: undefined,
-            message:
-              "Fuente de investigación pendiente; se conserva la evidencia anterior y se reintentará con enfriamiento.",
+            message: exhausted
+              ? "Cuota gratuita compartida agotada; la investigación adicional se retoma tras el reinicio UTC, conservando la evidencia anterior."
+              : "Fuente de investigación pendiente; se conserva la evidencia anterior y se reintentará con enfriamiento.",
           };
           await tx
             .insert(financeSync)
@@ -209,12 +222,29 @@ export async function prepareStockContext(
       }
     }
   }
+  const relevant = new Set(
+    candidates.flatMap((candidate) => [
+      `stock-facts:${candidate.symbol}`,
+      `stock-history:${candidate.symbol}`,
+    ]),
+  );
+  const states = (await db.select().from(financeSync))
+    .filter((row) => relevant.has(row.id))
+    .map((row) => row.data);
+  if (states.some((state) => state.status === "configuration"))
+    warnings.push(
+      "Cuota gratuita compartida en pausa: los datos adicionales pendientes se reintentan después del reinicio UTC. No se contrata capacidad ni se inventan cifras.",
+    );
+  if (states.some((state) => state.status === "error"))
+    warnings.push(
+      "Parte de las fuentes de investigación quedó pendiente; se conserva la evidencia anterior y se reintentará con enfriamiento.",
+    );
   warnings.push(
     "Cobertura inicial acotada de emisores y relaciones documentadas; no representa todas las empresas ni identifica automáticamente todos los proveedores. Las relaciones no prueban dirección bursátil ni ingresos de un proyecto.",
   );
   if (candidates.some((c) => !c.facts || !c.history))
     warnings.push(
-      "La cobertura se completa por lotes: hasta tres consultas SEC y un histórico por ciclo, con caché semanal y cuota Alpha compartida. Un dato ausente no se sustituye por cero.",
+      "La cobertura se completa por lotes: hasta tres consultas de fundamentales y un histórico por ciclo, con caché semanal y cuota Alpha compartida. Un dato ausente no se sustituye por cero.",
     );
   return {
     version: 1,
