@@ -25,7 +25,6 @@ import {
   Sparkles,
   Sun,
   X,
-  MessageSquare,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
@@ -34,7 +33,6 @@ import { CompanyPanel } from "./company-panel";
 import { IdeaCard, OpportunityPanel } from "./opportunity-panel";
 import { SettingsView, SourcesView } from "./sources-view";
 import { ResearchWorkspace } from "./research-workspace";
-import { ValidationWorkspace } from "./validation-workspace";
 import { OperationsView } from "./operations-view";
 import { EvidenceWorkspace } from "./evidence-workspace";
 import { FinanceWorkspace } from "./finance-workspace";
@@ -56,17 +54,13 @@ type View =
   | "ideas"
   | "sources"
   | "settings"
-  | "validation"
   | "operations"
-  | "finance"
-  | "evidence";
+  | "finance";
 const navigation = [
   { id: "today" as const, label: "Mi briefing", icon: Newspaper },
   { id: "finance" as const, label: "Mi portafolio", icon: Wallet },
-  { id: "saved" as const, label: "Guardados", icon: Bookmark },
   { id: "ideas" as const, label: "Oportunidades", icon: Lightbulb },
-  { id: "evidence" as const, label: "Radar de problemas", icon: Compass },
-  { id: "validation" as const, label: "Entrevistas", icon: MessageSquare },
+  { id: "saved" as const, label: "Guardados", icon: Bookmark },
 ];
 const categoryColors: Record<Category, string> = {
   IA: "#759788",
@@ -83,7 +77,6 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [view, setView] = useState<View>("today");
-  const [validationProjectId, setValidationProjectId] = useState<string>();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | "Todas">("Todas");
   const [selectedId, setSelectedId] = useState<string>();
@@ -349,39 +342,6 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
     setMenuOpen(false);
     setMobileTab("news");
   }
-  async function prepareInterviews(
-    opportunityId: string,
-    eventId?: string,
-    savedId?: string,
-  ) {
-    if (data.demo) {
-      setToast("Abre tu espacio real para crear una investigación.");
-      return;
-    }
-    try {
-      const response = await fetch("/api/validation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "from-opportunity",
-          opportunityId,
-          eventId,
-          savedId,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
-      await reload();
-      setValidationProjectId(result.projectId);
-      navigate("validation");
-    } catch (error) {
-      setToast(
-        error instanceof Error
-          ? error.message
-          : "No se pudo preparar la investigación.",
-      );
-    }
-  }
   const edition =
     slot === "latest"
       ? undefined
@@ -632,40 +592,6 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
             />
           ) : view === "finance" ? (
             <FinanceWorkspace demo={data.demo} />
-          ) : view === "evidence" ? (
-            <EvidenceWorkspace
-              data={
-                data.evidence ?? {
-                  records: [],
-                  reviews: [],
-                  dossiers: [],
-                  sources: [],
-                  reports: [],
-                  totalRecords: 0,
-                  storageLimited: false,
-                }
-              }
-              demo={data.demo}
-              onRefresh={reload}
-              onProject={(id) => {
-                setValidationProjectId(id);
-                void reload()
-                  .then(() => navigate("validation"))
-                  .catch(() =>
-                    setToast(
-                      "No se pudo abrir la investigación. Intenta de nuevo.",
-                    ),
-                  );
-              }}
-            />
-          ) : view === "validation" ? (
-            <ValidationWorkspace
-              key={validationProjectId ?? "workspace"}
-              initialProjectId={validationProjectId}
-              data={data.validation ?? { projects: [], interviews: [] }}
-              onReload={reload}
-              demo={data.demo}
-            />
           ) : (
             <>
               <div className="page-heading">
@@ -893,66 +819,87 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                 </div>
               ) : null}
               {view === "ideas" ? (
-                <ResearchWorkspace
-                  data={data}
-                  query={query}
-                  onValidate={(id, eventId) =>
-                    void prepareInterviews(id, eventId)
-                  }
-                  onNote={(id, note, state) =>
-                    void saveNote(id, note, state, "note")
-                  }
-                  onReport={async () => {
-                    try {
-                      const response = await fetch("/api/research/report", {
-                        method: "POST",
-                      });
-                      if (!response.ok) throw new Error("report");
-                      await reload();
-                      setToast("Reporte guardado en oportunidades.");
-                    } catch {
-                      setToast(
-                        "No se pudo generar el reporte. Intenta de nuevo.",
-                      );
+                <>
+                  <ResearchWorkspace
+                    data={data}
+                    query={query}
+                    onNote={(id, note, state) =>
+                      void saveNote(id, note, state, "note")
                     }
-                  }}
-                >
-                  <div className="ideas-library">
-                    {filteredIdeas.length ? (
-                      filteredIdeas.map((idea) => (
-                        <IdeaCard
-                          key={idea.id}
-                          idea={idea}
-                          stories={data.stories}
-                          saved={data.saved.find((s) => s.id === idea.id)}
-                          onSave={() => void toggleSave(idea.id, "idea")}
-                          onValidate={() => void prepareInterviews(idea.id)}
-                          onNote={(note, state) =>
-                            void saveNote(idea.id, note, state)
+                    onReport={async () => {
+                      try {
+                        const response = await fetch("/api/research/report", {
+                          method: "POST",
+                        });
+                        if (!response.ok) throw new Error("report");
+                        await reload();
+                        setToast("Reporte guardado en oportunidades.");
+                      } catch {
+                        setToast(
+                          "No se pudo generar el reporte. Intenta de nuevo.",
+                        );
+                      }
+                    }}
+                  >
+                    <div className="ideas-library">
+                      {filteredIdeas.length ? (
+                        filteredIdeas.map((idea) => (
+                          <IdeaCard
+                            key={idea.id}
+                            idea={idea}
+                            stories={data.stories}
+                            saved={data.saved.find((s) => s.id === idea.id)}
+                            onSave={() => void toggleSave(idea.id, "idea")}
+                            onNote={(note, state) =>
+                              void saveNote(idea.id, note, state)
+                            }
+                          />
+                        ))
+                      ) : (
+                        <EmptyState
+                          icon="ideas"
+                          title={
+                            query
+                              ? "Todavía no hay una coincidencia"
+                              : "Las buenas ideas empiezan con una señal"
+                          }
+                          description={
+                            query
+                              ? "Intenta con otra palabra o limpia tu búsqueda."
+                              : "El motor busca solicitudes y fricción en fuentes públicas. Las señales aisladas se guardan en el cuaderno; las hipótesis requieren repetición de varios autores."
+                          }
+                          action={
+                            query ? "Limpiar búsqueda" : "Ver mis fuentes"
+                          }
+                          onAction={() =>
+                            query ? setQuery("") : navigate("sources")
                           }
                         />
-                      ))
-                    ) : (
-                      <EmptyState
-                        icon="ideas"
-                        title={
-                          query
-                            ? "Todavía no hay una coincidencia"
-                            : "Las buenas ideas empiezan con una señal"
+                      )}
+                    </div>
+                  </ResearchWorkspace>
+                  <details className="opportunity-secondary">
+                    <summary>
+                      Radar de problemas · evidencia y cobertura{" "}
+                      <ChevronRight size={14} />
+                    </summary>
+                    <EvidenceWorkspace
+                      data={
+                        data.evidence ?? {
+                          records: [],
+                          reviews: [],
+                          dossiers: [],
+                          sources: [],
+                          reports: [],
+                          totalRecords: 0,
+                          storageLimited: false,
                         }
-                        description={
-                          query
-                            ? "Intenta con otra palabra o limpia tu búsqueda."
-                            : "El motor busca solicitudes y fricción en fuentes públicas. Las señales aisladas se guardan en el cuaderno; las hipótesis requieren repetición de varios autores."
-                        }
-                        action={query ? "Limpiar búsqueda" : "Ver mis fuentes"}
-                        onAction={() =>
-                          query ? setQuery("") : navigate("sources")
-                        }
-                      />
-                    )}
-                  </div>
-                </ResearchWorkspace>
+                      }
+                      demo={data.demo}
+                      onRefresh={reload}
+                    />
+                  </details>
+                </>
               ) : (
                 <>
                   <div
@@ -1081,13 +1028,6 @@ export function Dashboard({ initialData }: { initialData: DashboardData }) {
                               stories={data.stories}
                               saved={data.saved.find((s) => s.id === idea.id)}
                               onSave={() => void toggleSave(idea.id, "idea")}
-                              onValidate={() =>
-                                void prepareInterviews(
-                                  idea.id,
-                                  undefined,
-                                  idea.id,
-                                )
-                              }
                               onNote={(note, state) =>
                                 void saveNote(idea.id, note, state)
                               }

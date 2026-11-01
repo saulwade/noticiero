@@ -3,6 +3,7 @@ import type {
   FinanceNewsEvent,
   FinanceNewsReview,
 } from "./research-types";
+import type { AutomationWorkspace } from "./automatic-types";
 export type Currency = "MXN" | "USD";
 export type Instrument = {
   id: string;
@@ -61,6 +62,7 @@ export type FinanceSyncState = {
   leaseUntil?: string;
   scanCursor?: string;
   scanComplete?: boolean;
+  inputHash?: string;
 };
 export type FinanceMarketStatus = {
   alphaVantageConfigured: boolean;
@@ -164,6 +166,7 @@ export type CompanyResearch = {
   warnings: string[];
 };
 export type FinanceData = {
+  automation?: AutomationWorkspace;
   newsResearch?: FinanceNewsWorkspace;
   market?: FinanceMarketStatus;
   relatedNews?: {

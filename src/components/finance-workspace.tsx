@@ -11,11 +11,8 @@ import {
 import {
   ArrowDownToLine,
   ArrowUpRight,
-  BookOpen,
-  Check,
   ChevronRight,
   Plus,
-  Wallet,
 } from "lucide-react";
 import type {
   FinanceData,
@@ -23,14 +20,12 @@ import type {
   MovementKind,
 } from "@/features/finance/types";
 import { editionFor } from "@/lib/time";
+import { FinanceCapturedNews } from "./finance-news-workspace";
 import {
-  FinanceDailyStatus,
-  FinanceProcessGuide,
-} from "./finance-daily-status";
-import {
-  FinanceNewsWorkspace,
-  FinanceCapturedNews,
-} from "./finance-news-workspace";
+  FinanceAutomaticPortfolio,
+  FinanceAutomaticAnalysis,
+  FinanceAutomationStatus,
+} from "./finance-automatic-report";
 import "./finance-workspace.css";
 
 const movementNames: Record<MovementKind, string> = {
@@ -45,7 +40,6 @@ const movementNames: Record<MovementKind, string> = {
   exchange: "Conversión de moneda",
   split: "Split",
 };
-const kindNames = { stock: "Acción", etf: "ETF", bond: "Deuda" };
 const csvHeader =
   "date,kind,symbol,exchange,currency,quantity,price,amount,fee,fxRate,note,reference";
 
@@ -149,32 +143,6 @@ function Decimal({
     </Field>
   );
 }
-function LongText({
-  label,
-  name,
-  required = false,
-  defaultValue,
-  hint,
-}: {
-  label: string;
-  name: string;
-  required?: boolean;
-  defaultValue?: string;
-  hint?: string;
-}) {
-  return (
-    <Field label={label} hint={hint}>
-      <textarea
-        aria-label={label}
-        name={name}
-        required={required}
-        defaultValue={defaultValue}
-        rows={3}
-        maxLength={12000}
-      />
-    </Field>
-  );
-}
 function InstrumentSelect({
   instruments,
   required = true,
@@ -245,9 +213,9 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
   const [data, setData] = useState<FinanceData | undefined>(
     demo ? emptyData : undefined,
   );
-  const [tab, setTab] = useState<
-    "summary" | "movements" | "research" | "journal"
-  >("summary");
+  const [tab, setTab] = useState<"portfolio" | "analysis" | "movements">(
+    "portfolio",
+  );
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
   const [busy, setBusy] = useState(false);
   const [showMovement, setShowMovement] = useState(false);
@@ -356,23 +324,17 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
   }
   const disabled = demo || busy;
   const instruments = data?.instruments ?? [];
-  const hasMovements =
-    (data?.counts?.movements ?? data?.movements.length ?? 0) > 0;
   const instrument = (id: string) => instruments.find((i) => i.id === id);
 
   return (
     <section className="finance-workspace" aria-label="Portafolio personal">
       <div className="fi-heading">
         <div>
-          <span className="fi-eyebrow">OBSERVAR · ENTENDER · DECIDIR</span>
-          <h1>
-            Tu dinero.
-            <br />
-            <em>Con perspectiva.</em>
-          </h1>
+          <span className="fi-eyebrow">TU PATRIMONIO · CON PERSPECTIVA</span>
+          <h1>Mi portafolio.</h1>
           <p>
-            Noticias para investigar, una estrategia por construir y tus
-            movimientos cuando empieces a invertir.
+            Una propuesta calculada, sus razones y tu historial real. El
+            análisis diario se prepara automáticamente.
           </p>
         </div>
         <div className="fi-heading-actions">
@@ -382,17 +344,6 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
             onClick={() => void download()}
           >
             <ArrowDownToLine size={13} /> Exportar
-          </button>
-          <button
-            className={`fi-button ${hasMovements ? "fi-primary" : ""}`}
-            disabled={disabled || !data}
-            onClick={() => {
-              setTab("movements");
-              setShowMovement(true);
-              setReference(crypto.randomUUID());
-            }}
-          >
-            <Plus size={14} /> Registrar movimiento
           </button>
         </div>
       </div>
@@ -410,14 +361,27 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
           {notice.text}
         </p>
       ) : null}
+      <div className="fi-tabs" role="group" aria-label="Vistas del portafolio">
+        {(
+          [
+            ["portfolio", "Mi cartera"],
+            ["analysis", "Qué hacer y por qué"],
+            ["movements", "Movimientos"],
+          ] as const
+        ).map(([id, title]) => (
+          <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
+            {title}
+          </button>
+        ))}
+      </div>
       {!data ? (
-        <div className="fi-empty">
-          <Wallet size={28} strokeWidth={1.2} />
+        <div className="fi-auto-awaiting">
           <h2>
             {notice?.error
-              ? "El portafolio está pendiente."
-              : "Preparando tu espacio…"}
+              ? "No se pudo consultar el portafolio."
+              : "Consultando tu informe…"}
           </h2>
+          <p>Los registros privados se cargarán aquí.</p>
           {notice?.error ? (
             <button
               className="fi-button"
@@ -429,198 +393,455 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
             >
               Reintentar
             </button>
-          ) : (
-            <p>Consultando registros privados.</p>
-          )}
+          ) : null}
         </div>
       ) : (
         <>
-          {hasMovements ? (
-            <div className="fi-overview">
-              <div>
-                <span>
-                  {data.summary.complete
-                    ? "Valor del portafolio"
-                    : "Valor conocido · parcial"}
-                </span>
-                <strong>
-                  {money(
-                    data.summary.complete
-                      ? data.summary.valueMxn
-                      : data.summary.knownValueMxn,
-                  )}
-                </strong>
-                <small>MXN · {date(data.summary.asOf)}</small>
-              </div>
-              <div>
-                <span>Dinero aportado</span>
-                <strong>{money(data.summary.contributionsMxn)}</strong>
-                <small>Los depósitos no son ganancias</small>
-              </div>
-              <div>
-                <span>Resultado acumulado</span>
-                <strong>{money(data.summary.pnlMxn)}</strong>
-                <small>Con los costos y retenciones registrados</small>
-              </div>
-            </div>
-          ) : (
-            <p className="fi-account-pending">
-              <Wallet size={14} /> Cartera sin iniciar · puedes leer e
-              investigar sin registrar dinero.
-            </p>
-          )}
-          <div
-            className="fi-tabs"
-            role="group"
-            aria-label="Vistas del portafolio"
-          >
-            {(
-              [
-                ["summary", "Resumen"],
-                ["movements", "Movimientos"],
-                ["research", "Investigar"],
-                ["journal", "Diario"],
-              ] as const
-            ).map(([id, title]) => (
-              <button
-                key={id}
-                aria-pressed={tab === id}
-                onClick={() => setTab(id)}
-              >
-                {title}
-              </button>
-            ))}
-          </div>
-          {"viewLimited" in data && data.viewLimited ? (
+          <FinanceAutomationStatus automation={data.automation} demo={demo} />
+          {data.viewLimited ? (
             <p className="fi-hint">
               Ves una muestra del archivo. Los totales usan todos los
               movimientos; Exportar incluye el historial completo.
             </p>
           ) : null}
-          {tab === "summary" ? (
+          {tab === "portfolio" ? (
             <>
-              <FinanceNewsWorkspace
-                data={data.newsResearch}
-                compact
-                disabled={disabled}
-                demo={demo}
-                onSave={(payload) => post("news-review", payload)}
-                onInvestigate={() => setTab("research")}
-              />
-
-              {data.summary.warnings.length ? (
-                <details className="fi-disclosure fi-warning">
-                  <summary>
-                    Datos por revisar{" "}
-                    <span>{data.summary.warnings.length}</span>
-                    <ChevronRight size={14} />
-                  </summary>
-                  <ul>
-                    {data.summary.warnings.map((text, i) => (
-                      <li key={i}>{text}</li>
-                    ))}
-                  </ul>
-                </details>
-              ) : null}
-              {!hasMovements ? (
-                <div className="fi-welcome">
-                  <Wallet size={28} strokeWidth={1.2} />
-                  <div>
-                    <h2>Primero diseñamos tu portafolio.</h2>
-                    <p>
-                      Puedes explorar la herramienta sin registrar dinero.
-                      Cuando acordemos una distribución, registraremos solo tus
-                      aportaciones y compras reales. Tu reserva externa queda
-                      fuera del portafolio.
-                    </p>
-                  </div>
+              <FinanceAutomaticPortfolio data={data} />{" "}
+              <details className="fi-disclosure">
+                <summary>
+                  Rendimiento y límites del análisis <ChevronRight size={14} />
+                </summary>
+                <p>{data.summary.performance.reason}</p>
+                <div className="fi-performance">
+                  <span>
+                    TWR · sin efecto de aportaciones{" "}
+                    <strong>{percent(data.summary.performance.twr)}</strong>
+                  </span>
+                  <span>
+                    MWR · resultado del dinero por fecha{" "}
+                    <strong>{percent(data.summary.performance.mwr)}</strong>
+                  </span>
                 </div>
-              ) : null}
-              <FinanceDailyStatus market={data.market} demo={demo} />
-              <FinanceProcessGuide />
-              {hasMovements ? (
-                <div className="fi-two-columns">
-                  <article className="fi-panel">
-                    <span className="fi-eyebrow">LA SIGUIENTE APORTACIÓN</span>
-                    <h2>{data.summary.proposal.label}</h2>
-                    <p>{data.summary.proposal.reason}</p>
-                    <strong className="fi-amount">
-                      {money(data.summary.proposal.amountMxn)}
-                    </strong>
-                    {data.summary.proposal.items.length ? (
-                      <ul className="fi-proposals">
-                        {data.summary.proposal.items.map((item) => (
-                          <li key={item.instrumentId}>
-                            <span>
-                              {instrument(item.instrumentId)?.symbol ??
-                                (item.instrumentId === "CASH_MXN"
-                                  ? "Efectivo MXN"
-                                  : item.instrumentId === "CASH_USD"
-                                    ? "Efectivo USD"
-                                    : item.instrumentId)}
-                            </span>
-                            <strong>{money(item.amountMxn)}</strong>
-                            <small>
-                              Peso posterior {percent(item.afterWeight)}
-                            </small>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {data.summary.proposal.missing.length ? (
-                      <details className="fi-compact">
-                        <summary>Qué falta confirmar</summary>
-                        <ul>
-                          {data.summary.proposal.missing.map((item, i) => (
-                            <li key={i}>{item}</li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-                    <p className="fi-footnote">
-                      Una simulación para revisar. Precios de referencia,
-                      disponibilidad y costos finales se confirman en el
-                      intermediario; Noticiero no ejecuta operaciones.
+                <p className="fi-footnote">
+                  Historial insuficiente se muestra como pendiente. Una caída
+                  puede prolongarse y una inversión puede no recuperarse. El
+                  análisis no garantiza un rendimiento futuro.
+                </p>
+              </details>
+            </>
+          ) : null}
+          {tab === "analysis" ? (
+            <FinanceAutomaticAnalysis automation={data.automation} />
+          ) : null}
+          {tab === "movements" ? (
+            <>
+              <div className="fi-section-heading">
+                <div>
+                  <h2>Tu historial, sin perder el contexto.</h2>
+                  <p>
+                    Los movimientos se conservan. Una corrección crea un reverso
+                    auditable.
+                  </p>
+                </div>
+              </div>
+              <details className="fi-disclosure">
+                <summary>
+                  Registrar una operación real <Plus size={14} />
+                </summary>
+                <p className="fi-hint">
+                  Herramienta opcional de registro. El informe diario no
+                  requiere capturas manuales.
+                </p>
+                <button
+                  className="fi-button"
+                  disabled={disabled}
+                  onClick={() => {
+                    setShowMovement(true);
+                    setReference(crypto.randomUUID());
+                  }}
+                >
+                  Registrar movimiento
+                </button>
+                {showMovement ? (
+                  <form
+                    className="fi-editor"
+                    aria-label="Registrar movimiento"
+                    onSubmit={(e) => {
+                      const f = fields(e);
+                      void post("movement", {
+                        ...f,
+                        kind: movementKind,
+                        currency: movementCurrency,
+                        amount: f.amount || "0",
+                        fee: f.fee || "0",
+                        note: f.note || "",
+                        reference: reference || crypto.randomUUID(),
+                      }).then((ok) => {
+                        if (ok) {
+                          setShowMovement(false);
+                          setReference(crypto.randomUUID());
+                        }
+                      });
+                    }}
+                  >
+                    <fieldset disabled={disabled}>
+                      <div className="fi-editor-heading">
+                        <h3>Nuevo movimiento</h3>
+                        <button
+                          className="fi-text-button"
+                          type="button"
+                          onClick={() => setShowMovement(false)}
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                      <div className="fi-form-grid">
+                        <Field label="Tipo de movimiento">
+                          <select
+                            aria-label="Tipo de movimiento"
+                            value={movementKind}
+                            onChange={(e) =>
+                              setMovementKind(e.target.value as MovementKind)
+                            }
+                          >
+                            {Object.entries(movementNames).map(([id, name]) => (
+                              <option key={id} value={id}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Text
+                          label="Fecha del movimiento"
+                          name="date"
+                          type="date"
+                          defaultValue={editionFor().date}
+                          required
+                        />
+                        <Field label="Moneda del movimiento">
+                          <select
+                            aria-label="Moneda del movimiento"
+                            value={movementCurrency}
+                            onChange={(e) =>
+                              setMovementCurrency(e.target.value)
+                            }
+                          >
+                            <option value="MXN">MXN</option>
+                            <option value="USD">USD</option>
+                          </select>
+                        </Field>
+                        {["buy", "sell", "dividend", "split"].includes(
+                          movementKind,
+                        ) ? (
+                          <InstrumentSelect
+                            instruments={instruments}
+                            label="Instrumento del movimiento"
+                            required={movementKind !== "dividend"}
+                            onChange={(id) => {
+                              const i = instrument(id);
+                              if (i) setMovementCurrency(i.currency);
+                            }}
+                          />
+                        ) : null}
+                        {["buy", "sell", "split"].includes(movementKind) ? (
+                          <Decimal
+                            label={
+                              movementKind === "split"
+                                ? "Factor del split"
+                                : "Cantidad de títulos"
+                            }
+                            name="quantity"
+                            required
+                            hint={
+                              movementKind === "split"
+                                ? "Un split 2:1 se registra como 2."
+                                : undefined
+                            }
+                          />
+                        ) : null}
+                        {["buy", "sell"].includes(movementKind) ? (
+                          <Decimal
+                            label="Precio de ejecución"
+                            name="price"
+                            required
+                          />
+                        ) : movementKind !== "split" ? (
+                          <Decimal
+                            label="Importe del movimiento"
+                            name="amount"
+                            required
+                          />
+                        ) : null}
+                        {movementKind !== "split" ? (
+                          <Decimal
+                            label="Comisión adicional"
+                            name="fee"
+                            defaultValue="0"
+                            hint="En la misma moneda del movimiento; no la dupliques en el importe."
+                          />
+                        ) : null}
+                        {movementKind === "exchange" ||
+                        movementCurrency === "USD" ? (
+                          <Decimal
+                            label="Tipo de cambio ejecutado MXN por USD"
+                            name="fxRate"
+                            required={
+                              movementKind === "exchange" ||
+                              ["deposit", "withdrawal"].includes(movementKind)
+                            }
+                            hint="Conserva el tipo de cambio real; no uses una cotización estimada."
+                          />
+                        ) : null}
+                        <Text label="Nota del movimiento" name="note" />
+                      </div>
+                      <p className="fi-footnote">
+                        La conversión descuenta la moneda de origen y acredita
+                        la otra. Compras, ventas y conversiones no son
+                        aportaciones.
+                      </p>
+                      <button className="fi-button fi-primary" type="submit">
+                        Guardar movimiento
+                      </button>
+                    </fieldset>
+                  </form>
+                ) : null}
+              </details>
+              {data.movements.length ? (
+                <div className="fi-movements">
+                  {[...data.movements].reverse().map((m) => (
+                    <details className="fi-movement" key={m.id}>
+                      <summary>
+                        <span className="fi-movement-type">
+                          {movementNames[m.kind]}
+                          {m.reversesId ? " · Reverso" : ""}
+                          <small>
+                            {date(m.date)}
+                            {m.instrumentId
+                              ? ` · ${instrument(m.instrumentId)?.symbol ?? m.instrumentId}`
+                              : ""}
+                          </small>
+                        </span>
+                        <strong>
+                          {["buy", "sell", "split"].includes(m.kind)
+                            ? `${m.quantity ?? "—"} títulos`
+                            : money(m.amount, m.currency)}
+                          <small>{m.currency}</small>
+                        </strong>
+                        <ChevronRight size={13} />
+                      </summary>
+                      <div className="fi-movement-detail">
+                        <p>{m.note || "Sin nota adicional."}</p>
+                        {m.price ? (
+                          <p>
+                            Precio de ejecución: {money(m.price, m.currency)}
+                          </p>
+                        ) : null}
+                        <p>
+                          Comisión adicional: {money(m.fee, m.currency)}
+                          {m.fxRate
+                            ? ` · Cambio ejecutado: ${m.fxRate} MXN/USD`
+                            : ""}
+                        </p>
+                        {!m.reversesId &&
+                        !data.movements.some(
+                          (other) => other.reversesId === m.id,
+                        ) ? (
+                          <form
+                            onSubmit={(e) => {
+                              const f = fields(e);
+                              void post("reverse", {
+                                movementId: m.id,
+                                note: f.note,
+                              });
+                            }}
+                          >
+                            <fieldset disabled={disabled}>
+                              <Text
+                                label={`Motivo de corrección ${m.id}`}
+                                name="note"
+                                required
+                              />
+                              <button className="fi-button" type="submit">
+                                Crear reverso
+                              </button>
+                            </fieldset>
+                          </form>
+                        ) : (
+                          <p>
+                            Se conserva para auditoría; no se vuelve a
+                            contabilizar.
+                          </p>
+                        )}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              ) : (
+                <div className="fi-empty">
+                  <h3>Aún no hay movimientos.</h3>
+                  <p>
+                    El informe y la cartera propuesta no crean movimientos. Aquí
+                    se conservarán únicamente las operaciones ejecutadas.
+                  </p>
+                </div>
+              )}
+              <details className="fi-disclosure">
+                <summary>
+                  Importar movimientos CSV <ChevronRight size={14} />
+                </summary>
+                <p>
+                  Si el CSV incluye compras o ventas, registra sus instrumentos
+                  en las herramientas de abajo. La selección del archivo no
+                  envía datos; revisa el formato y pulsa Importar.
+                </p>
+                <code className="fi-csv-schema">{csvHeader}</code>
+                <p className="fi-footnote">
+                  Fechas YYYY-MM-DD, números con punto decimal y tipos deposit,
+                  withdrawal, buy, sell, dividend, interest, fee, tax, exchange,
+                  split. Máximo 1 MB. Conserva una referencia única por
+                  operación.
+                </p>
+                <fieldset disabled={disabled}>
+                  <Field label="Archivo CSV de movimientos">
+                    <input
+                      aria-label="Archivo CSV de movimientos"
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(e) => {
+                        const selected = ++csvSelection.current;
+                        setCsv("");
+                        setCsvName("");
+                        setReadingCsv(false);
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 1_000_000) {
+                          setNotice({
+                            text: "El CSV supera 1 MB.",
+                            error: true,
+                          });
+                          return;
+                        }
+                        setReadingCsv(true);
+                        void file
+                          .text()
+                          .then((text) => {
+                            if (selected !== csvSelection.current) return;
+                            setCsv(text);
+                            setCsvName(file.name);
+                          })
+                          .catch(() => {
+                            if (selected === csvSelection.current)
+                              setNotice({
+                                text: "No pudimos leer ese archivo CSV.",
+                                error: true,
+                              });
+                          })
+                          .finally(() => {
+                            if (selected === csvSelection.current)
+                              setReadingCsv(false);
+                          });
+                      }}
+                    />
+                  </Field>
+                  {csvName ? (
+                    <p className="fi-hint">
+                      Listo para validar: {csvName}. Aún no se ha enviado.
                     </p>
-                  </article>
-                  <article className="fi-panel">
-                    <span className="fi-eyebrow">DISTRIBUCIÓN ACTUAL</span>
-                    <h2>Dónde está tu dinero</h2>
-                    {data.summary.allocation.length ? (
-                      <ul className="fi-distribution">
-                        {data.summary.allocation.map((item, i) => (
-                          <li key={`${item.label}-${i}`}>
-                            <span>{item.label}</span>
-                            <strong>{money(item.valueMxn)}</strong>
-                            <small>{percent(item.weight)}</small>
-                            {item.weight !== undefined ? (
-                              <div className="fi-bar">
-                                <i
-                                  style={{
-                                    width: `${Math.min(100, Math.max(0, item.weight))}%`,
-                                  }}
-                                />
-                              </div>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p>Aún no hay una distribución para comparar.</p>
-                    )}
-                    <div className="fi-cash">
-                      <span>Efectivo disponible</span>
-                      <strong>{money(data.summary.cash.MXN)} MXN</strong>
-                      <strong>{money(data.summary.cash.USD, "USD")} USD</strong>
+                  ) : null}
+                  <button
+                    className="fi-button fi-primary"
+                    disabled={!csv || disabled || readingCsv}
+                    onClick={() =>
+                      void post("import", { csv }).then((ok) => {
+                        if (ok) {
+                          setCsv("");
+                          setCsvName("");
+                        }
+                      })
+                    }
+                  >
+                    Importar movimientos
+                  </button>
+                </fieldset>
+              </details>
+              <details className="fi-disclosure">
+                <summary>
+                  Registrar instrumento para operaciones <Plus size={14} />
+                </summary>
+                <form
+                  onSubmit={(e) => {
+                    const form = e.currentTarget;
+                    const f = fields(e);
+                    void post("instrument", {
+                      ...f,
+                      fractional: f.fractional === "on",
+                    }).then((ok) => {
+                      if (ok) form.reset();
+                    });
+                  }}
+                >
+                  <fieldset disabled={disabled}>
+                    <div className="fi-form-grid">
+                      <Text
+                        label="Símbolo del instrumento"
+                        name="symbol"
+                        required
+                        placeholder="Símbolo confirmado en tu mercado"
+                      />
+                      <Text
+                        label="Nombre del instrumento"
+                        name="name"
+                        required
+                      />
+                      <Field label="Tipo de instrumento">
+                        <select aria-label="Tipo de instrumento" name="kind">
+                          <option value="etf">ETF</option>
+                          <option value="stock">Acción</option>
+                          <option value="bond">Deuda</option>
+                        </select>
+                      </Field>
+                      <Field label="Moneda de cotización">
+                        <select
+                          aria-label="Moneda de cotización"
+                          name="currency"
+                        >
+                          <option value="MXN">MXN</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </Field>
+                      <Text
+                        label="Mercado del instrumento"
+                        name="exchange"
+                        required
+                        placeholder="Mercado confirmado, por ejemplo NYSE"
+                      />
+                      <Text
+                        label="País sustentado"
+                        name="country"
+                        hint="Opcional. El mercado de cotización no demuestra exposición económica."
+                      />
+                      <Text label="Sector sustentado" name="sector" />
+                      <Text
+                        label="Fuente oficial del instrumento"
+                        name="sourceUrl"
+                        type="url"
+                      />
+                      <Text
+                        label="CIK de SEC"
+                        name="cik"
+                        hint="Opcional. Identificador oficial del emisor estadounidense."
+                      />
                     </div>
-                    <p className="fi-footnote">
-                      Moneda de cotización y exposición económica son
-                      diferentes. La composición por país o sector requiere
-                      fuentes fechadas.
-                    </p>
-                  </article>
-                </div>
-              ) : null}
+                    <label className="fi-check">
+                      <input type="checkbox" name="fractional" /> Confirmé que
+                      mi intermediario permite fracciones de este instrumento.
+                    </label>
+                    <button className="fi-button fi-primary" type="submit">
+                      Guardar instrumento
+                    </button>
+                  </fieldset>
+                </form>
+              </details>
               <details className="fi-disclosure">
                 <summary>
                   Posiciones y precios de referencia <ChevronRight size={14} />
@@ -768,860 +989,106 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
                   </details>
                 ) : null}
               </details>
-              <details className="fi-disclosure">
-                <summary>
-                  Mi política y distribución objetivo{" "}
-                  <span>
-                    {data.policy?.approved ? "Aprobada" : "Por definir"}
-                  </span>
-                  <ChevronRight size={14} />
-                </summary>
-                <p>
-                  Elige tu propia distribución. No se presume una asignación ni
-                  una rentabilidad garantizada. Los pesos deben sumar 100 %.
-                </p>
-                <form
-                  key={data.policy?.updatedAt ?? "new-policy"}
-                  onSubmit={(e) => {
-                    const f = fields(e);
-                    const targets = [
-                      ...instruments.map((i) => i.id),
-                      "CASH_MXN",
-                      "CASH_USD",
-                    ]
-                      .map((id) => ({
-                        instrumentId: id,
-                        weight: Number(f[`target-${id}`] || 0),
-                      }))
-                      .filter((target) => target.weight > 0);
-                    void post("policy", {
-                      monthlyContributionMxn: f.monthlyContributionMxn,
-                      targets,
-                      approved: f.approved === "on",
-                    });
-                  }}
-                >
-                  <fieldset disabled={disabled}>
-                    <div className="fi-form-grid">
-                      <Decimal
-                        label="Aportación mensual prevista en MXN"
-                        name="monthlyContributionMxn"
-                        required
-                        defaultValue={data.policy?.monthlyContributionMxn}
-                      />
-                      {[
-                        ...instruments.map((i) => ({
-                          id: i.id,
-                          label: `${i.symbol} · ${i.exchange}`,
-                        })),
-                        { id: "CASH_MXN", label: "Efectivo MXN" },
-                        { id: "CASH_USD", label: "Efectivo USD" },
-                      ].map((i) => (
-                        <Field key={i.id} label={`Objetivo ${i.label} (%)`}>
-                          <input
-                            aria-label={`Objetivo ${i.label} (%)`}
-                            name={`target-${i.id}`}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            defaultValue={
-                              data.policy?.targets.find(
-                                (t) => t.instrumentId === i.id,
-                              )?.weight ?? 0
-                            }
-                          />
-                        </Field>
-                      ))}
-                    </div>
-                    <label className="fi-check">
-                      <input
-                        name="approved"
-                        type="checkbox"
-                        defaultChecked={data.policy?.approved ?? false}
-                      />{" "}
-                      He revisado y apruebo esta distribución como mi objetivo.
-                    </label>
-                    <button className="fi-button fi-primary" type="submit">
-                      Guardar política
-                    </button>
-                  </fieldset>
-                </form>
-              </details>
-              <details className="fi-disclosure">
-                <summary>
-                  Rendimiento y límites del análisis <ChevronRight size={14} />
-                </summary>
-                <p>{data.summary.performance.reason}</p>
-                <div className="fi-performance">
-                  <span>
-                    TWR · sin efecto de aportaciones{" "}
-                    <strong>{percent(data.summary.performance.twr)}</strong>
-                  </span>
-                  <span>
-                    MWR · resultado del dinero por fecha{" "}
-                    <strong>{percent(data.summary.performance.mwr)}</strong>
-                  </span>
-                </div>
-                <p className="fi-footnote">
-                  Historial insuficiente se muestra como pendiente. Una caída
-                  puede prolongarse y una inversión puede no recuperarse. El
-                  análisis no garantiza un rendimiento futuro.
-                </p>
-              </details>
             </>
           ) : null}
+
           {tab === "movements" ? (
-            <>
-              <div className="fi-section-heading">
-                <div>
-                  <h2>Tu historial, sin perder el contexto.</h2>
-                  <p>
-                    Los movimientos se conservan. Una corrección crea un reverso
-                    auditable.
-                  </p>
-                </div>
-              </div>
-              {showMovement ? (
-                <form
-                  className="fi-editor"
-                  aria-label="Registrar movimiento"
-                  onSubmit={(e) => {
-                    const f = fields(e);
-                    void post("movement", {
-                      ...f,
-                      kind: movementKind,
-                      currency: movementCurrency,
-                      amount: f.amount || "0",
-                      fee: f.fee || "0",
-                      note: f.note || "",
-                      reference: reference || crypto.randomUUID(),
-                    }).then((ok) => {
-                      if (ok) {
-                        setShowMovement(false);
-                        setReference(crypto.randomUUID());
-                      }
-                    });
-                  }}
-                >
-                  <fieldset disabled={disabled}>
-                    <div className="fi-editor-heading">
-                      <h3>Nuevo movimiento</h3>
-                      <button
-                        className="fi-text-button"
-                        type="button"
-                        onClick={() => setShowMovement(false)}
-                      >
-                        Cerrar
-                      </button>
-                    </div>
-                    <div className="fi-form-grid">
-                      <Field label="Tipo de movimiento">
-                        <select
-                          aria-label="Tipo de movimiento"
-                          value={movementKind}
-                          onChange={(e) =>
-                            setMovementKind(e.target.value as MovementKind)
-                          }
-                        >
-                          {Object.entries(movementNames).map(([id, name]) => (
-                            <option key={id} value={id}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Text
-                        label="Fecha del movimiento"
-                        name="date"
-                        type="date"
-                        defaultValue={editionFor().date}
-                        required
-                      />
-                      <Field label="Moneda del movimiento">
-                        <select
-                          aria-label="Moneda del movimiento"
-                          value={movementCurrency}
-                          onChange={(e) => setMovementCurrency(e.target.value)}
-                        >
-                          <option value="MXN">MXN</option>
-                          <option value="USD">USD</option>
-                        </select>
-                      </Field>
-                      {["buy", "sell", "dividend", "split"].includes(
-                        movementKind,
-                      ) ? (
-                        <InstrumentSelect
-                          instruments={instruments}
-                          label="Instrumento del movimiento"
-                          required={movementKind !== "dividend"}
-                          onChange={(id) => {
-                            const i = instrument(id);
-                            if (i) setMovementCurrency(i.currency);
-                          }}
-                        />
-                      ) : null}
-                      {["buy", "sell", "split"].includes(movementKind) ? (
-                        <Decimal
-                          label={
-                            movementKind === "split"
-                              ? "Factor del split"
-                              : "Cantidad de títulos"
-                          }
-                          name="quantity"
-                          required
-                          hint={
-                            movementKind === "split"
-                              ? "Un split 2:1 se registra como 2."
-                              : undefined
-                          }
-                        />
-                      ) : null}
-                      {["buy", "sell"].includes(movementKind) ? (
-                        <Decimal
-                          label="Precio de ejecución"
-                          name="price"
-                          required
-                        />
-                      ) : movementKind !== "split" ? (
-                        <Decimal
-                          label="Importe del movimiento"
-                          name="amount"
-                          required
-                        />
-                      ) : null}
-                      {movementKind !== "split" ? (
-                        <Decimal
-                          label="Comisión adicional"
-                          name="fee"
-                          defaultValue="0"
-                          hint="En la misma moneda del movimiento; no la dupliques en el importe."
-                        />
-                      ) : null}
-                      {movementKind === "exchange" ||
-                      movementCurrency === "USD" ? (
-                        <Decimal
-                          label="Tipo de cambio ejecutado MXN por USD"
-                          name="fxRate"
-                          required={
-                            movementKind === "exchange" ||
-                            ["deposit", "withdrawal"].includes(movementKind)
-                          }
-                          hint="Conserva el tipo de cambio real; no uses una cotización estimada."
-                        />
-                      ) : null}
-                      <Text label="Nota del movimiento" name="note" />
-                    </div>
-                    <p className="fi-footnote">
-                      La conversión descuenta la moneda de origen y acredita la
-                      otra. Compras, ventas y conversiones no son aportaciones.
-                    </p>
-                    <button className="fi-button fi-primary" type="submit">
-                      Guardar movimiento
-                    </button>
-                  </fieldset>
-                </form>
-              ) : null}
-              {data.movements.length ? (
-                <div className="fi-movements">
-                  {[...data.movements].reverse().map((m) => (
-                    <details className="fi-movement" key={m.id}>
-                      <summary>
-                        <span className="fi-movement-type">
-                          {movementNames[m.kind]}
-                          {m.reversesId ? " · Reverso" : ""}
-                          <small>
-                            {date(m.date)}
-                            {m.instrumentId
-                              ? ` · ${instrument(m.instrumentId)?.symbol ?? m.instrumentId}`
-                              : ""}
-                          </small>
-                        </span>
-                        <strong>
-                          {["buy", "sell", "split"].includes(m.kind)
-                            ? `${m.quantity ?? "—"} títulos`
-                            : money(m.amount, m.currency)}
-                          <small>{m.currency}</small>
-                        </strong>
-                        <ChevronRight size={13} />
-                      </summary>
-                      <div className="fi-movement-detail">
-                        <p>{m.note || "Sin nota adicional."}</p>
-                        {m.price ? (
-                          <p>
-                            Precio de ejecución: {money(m.price, m.currency)}
-                          </p>
-                        ) : null}
-                        <p>
-                          Comisión adicional: {money(m.fee, m.currency)}
-                          {m.fxRate
-                            ? ` · Cambio ejecutado: ${m.fxRate} MXN/USD`
-                            : ""}
-                        </p>
-                        {!m.reversesId &&
-                        !data.movements.some(
-                          (other) => other.reversesId === m.id,
-                        ) ? (
-                          <form
-                            onSubmit={(e) => {
-                              const f = fields(e);
-                              void post("reverse", {
-                                movementId: m.id,
-                                note: f.note,
-                              });
-                            }}
-                          >
-                            <fieldset disabled={disabled}>
-                              <Text
-                                label={`Motivo de corrección ${m.id}`}
-                                name="note"
-                                required
-                              />
-                              <button className="fi-button" type="submit">
-                                Crear reverso
-                              </button>
-                            </fieldset>
-                          </form>
-                        ) : (
-                          <p>
-                            Se conserva para auditoría; no se vuelve a
-                            contabilizar.
-                          </p>
-                        )}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              ) : (
-                <div className="fi-empty">
-                  <h3>Aún no hay movimientos.</h3>
-                  <p>
-                    Usa «Registrar movimiento» para comenzar con una aportación
-                    real.
-                  </p>
-                </div>
-              )}
-              <details className="fi-disclosure">
-                <summary>
-                  Importar movimientos CSV <ChevronRight size={14} />
-                </summary>
-                <p>
-                  Primero registra los instrumentos en Investigar. La selección
-                  del archivo no envía datos; revisa el formato y pulsa
-                  Importar.
-                </p>
-                <code className="fi-csv-schema">{csvHeader}</code>
-                <p className="fi-footnote">
-                  Fechas YYYY-MM-DD, números con punto decimal y tipos deposit,
-                  withdrawal, buy, sell, dividend, interest, fee, tax, exchange,
-                  split. Máximo 1 MB. Conserva una referencia única por
-                  operación.
-                </p>
-                <fieldset disabled={disabled}>
-                  <Field label="Archivo CSV de movimientos">
-                    <input
-                      aria-label="Archivo CSV de movimientos"
-                      type="file"
-                      accept=".csv,text/csv"
-                      onChange={(e) => {
-                        const selected = ++csvSelection.current;
-                        setCsv("");
-                        setCsvName("");
-                        setReadingCsv(false);
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 1_000_000) {
-                          setNotice({
-                            text: "El CSV supera 1 MB.",
-                            error: true,
-                          });
-                          return;
-                        }
-                        setReadingCsv(true);
-                        void file
-                          .text()
-                          .then((text) => {
-                            if (selected !== csvSelection.current) return;
-                            setCsv(text);
-                            setCsvName(file.name);
-                          })
-                          .catch(() => {
-                            if (selected === csvSelection.current)
-                              setNotice({
-                                text: "No pudimos leer ese archivo CSV.",
-                                error: true,
-                              });
-                          })
-                          .finally(() => {
-                            if (selected === csvSelection.current)
-                              setReadingCsv(false);
-                          });
-                      }}
-                    />
-                  </Field>
-                  {csvName ? (
-                    <p className="fi-hint">
-                      Listo para validar: {csvName}. Aún no se ha enviado.
-                    </p>
-                  ) : null}
-                  <button
-                    className="fi-button fi-primary"
-                    disabled={!csv || disabled || readingCsv}
-                    onClick={() =>
-                      void post("import", { csv }).then((ok) => {
-                        if (ok) {
-                          setCsv("");
-                          setCsvName("");
-                        }
-                      })
-                    }
-                  >
-                    Importar movimientos
-                  </button>
-                </fieldset>
-              </details>
-            </>
-          ) : null}
-          {tab === "research" ? (
-            <>
-              <FinanceNewsWorkspace
-                data={data.newsResearch}
-                disabled={disabled}
-                demo={demo}
-                onSave={(payload) => post("news-review", payload)}
-              />
-              <div className="fi-section-heading fi-tracking-heading">
-                <div>
-                  <h2>Tu lista de seguimiento.</h2>
-                  <p>
-                    Opcional: agrega instrumentos concretos para desarrollar una
-                    tesis. Las noticias anteriores no requieren este registro.
-                  </p>
-                </div>
-              </div>
-              <details className="fi-disclosure">
-                <summary>
-                  Agregar instrumento a seguimiento <Plus size={14} />
-                </summary>
-                <form
-                  onSubmit={(e) => {
-                    const form = e.currentTarget;
-                    const f = fields(e);
-                    void post("instrument", {
-                      ...f,
-                      fractional: f.fractional === "on",
-                    }).then((ok) => {
-                      if (ok) form.reset();
-                    });
-                  }}
-                >
-                  <fieldset disabled={disabled}>
-                    <div className="fi-form-grid">
-                      <Text
-                        label="Símbolo del instrumento"
-                        name="symbol"
-                        required
-                        placeholder="Símbolo confirmado en tu mercado"
-                      />
-                      <Text
-                        label="Nombre del instrumento"
-                        name="name"
-                        required
-                      />
-                      <Field label="Tipo de instrumento">
-                        <select aria-label="Tipo de instrumento" name="kind">
-                          <option value="etf">ETF</option>
-                          <option value="stock">Acción</option>
-                          <option value="bond">Deuda</option>
-                        </select>
-                      </Field>
-                      <Field label="Moneda de cotización">
-                        <select
-                          aria-label="Moneda de cotización"
-                          name="currency"
-                        >
-                          <option value="MXN">MXN</option>
-                          <option value="USD">USD</option>
-                        </select>
-                      </Field>
-                      <Text
-                        label="Mercado del instrumento"
-                        name="exchange"
-                        required
-                        placeholder="Mercado confirmado, por ejemplo NYSE"
-                      />
-                      <Text
-                        label="País sustentado"
-                        name="country"
-                        hint="Opcional. El mercado de cotización no demuestra exposición económica."
-                      />
-                      <Text label="Sector sustentado" name="sector" />
-                      <Text
-                        label="Fuente oficial del instrumento"
-                        name="sourceUrl"
-                        type="url"
-                      />
-                      <Text
-                        label="CIK de SEC"
-                        name="cik"
-                        hint="Opcional. Identificador oficial del emisor estadounidense."
-                      />
-                    </div>
-                    <label className="fi-check">
-                      <input type="checkbox" name="fractional" /> Confirmé que
-                      mi intermediario permite fracciones de este instrumento.
-                    </label>
-                    <button className="fi-button fi-primary" type="submit">
-                      Guardar instrumento
-                    </button>
-                  </fieldset>
-                </form>
-              </details>
-              {!instruments.length ? (
-                <div className="fi-empty">
-                  <BookOpen size={27} strokeWidth={1.2} />
-                  <h3>Tu lista todavía está vacía.</h3>
-                  <p>
-                    Puedes empezar leyendo las noticias y guardando tus
-                    preguntas arriba. Agrega un instrumento cuando quieras
-                    investigarlo con más detalle; no crea una compra.
-                  </p>
-                </div>
-              ) : (
-                <div className="fi-research-list">
-                  {instruments.map((i) => {
-                    const thesis = data.theses
-                      .filter((t) => t.instrumentId === i.id)
-                      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-                    const research = data.research
-                      .filter((r) => r.instrumentId === i.id)
-                      .sort((a, b) =>
-                        b.capturedAt.localeCompare(a.capturedAt),
-                      )[0];
-                    return (
-                      <details className="fi-instrument" key={i.id}>
-                        <summary>
-                          <div>
-                            <span className="fi-eyebrow">
-                              {kindNames[i.kind]} · {i.exchange} · {i.currency}
-                            </span>
-                            <h3>{i.name}</h3>
-                            <span>
-                              {i.symbol} ·{" "}
-                              {thesis.length
-                                ? `${thesis.length} versiones de tesis`
-                                : "Tesis por escribir"}
-                            </span>
-                          </div>
-                          <ChevronRight size={16} />
-                        </summary>
-                        <div className="fi-instrument-body">
-                          <p className="fi-hint">
-                            {i.fractional
-                              ? "Fracciones confirmadas por el usuario."
-                              : "Sin confirmación de fracciones."}
-                            {i.country
-                              ? ` País registrado: ${i.country}.`
-                              : " País no documentado."}
-                            {i.sector ? ` Sector: ${i.sector}.` : ""}
-                          </p>
-                          {i.sourceUrl ? (
-                            <a
-                              href={i.sourceUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Consultar fuente oficial{" "}
-                              <ArrowUpRight size={12} />
-                            </a>
-                          ) : (
-                            <p className="fi-footnote">
-                              Falta agregar una fuente oficial del instrumento.
-                            </p>
-                          )}
-                          {data.relatedNews?.some(
-                            (item) => item.instrumentId === i.id,
-                          ) ? (
-                            <details className="fi-compact">
-                              <summary>Menciones en noticias</summary>
-                              <p className="fi-footnote">
-                                Una mención no demuestra impacto financiero.
-                                Contrasta el hecho y su mecanismo antes de
-                                cambiar la tesis.
-                              </p>
-                              <ul>
-                                {data.relatedNews
-                                  .filter((item) => item.instrumentId === i.id)
-                                  .map((item) => (
-                                    <li key={item.url}>
-                                      <a
-                                        href={item.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        {item.title} <ArrowUpRight size={11} />
-                                      </a>
-                                      <p className="fi-footnote">
-                                        {item.sourceName} · Publicada{" "}
-                                        {date(item.publishedAt)}
-                                      </p>
-                                    </li>
-                                  ))}
-                              </ul>
-                            </details>
-                          ) : null}
-                          <div className="fi-research-note">
-                            <h4>
-                              {i.kind === "etf"
-                                ? "Qué revisar en este ETF"
-                                : i.kind === "bond"
-                                  ? "Qué revisar en esta deuda"
-                                  : /banc|bank|financ/i.test(i.sector ?? "")
-                                    ? "Una lectura para bancos"
-                                    : "Qué revisar en este negocio"}
-                            </h4>
-                            <p>
-                              {i.kind === "etf"
-                                ? "Índice, composición fechada, concentración, superposición, gastos, domicilio y liquidez. El ETF no se analiza como una empresa única."
-                                : i.kind === "bond"
-                                  ? "Emisor, vencimiento, moneda, liquidez y precio. Una tasa de referencia no equivale al precio ni al rendimiento de tu posición."
-                                  : /banc|bank|financ/i.test(i.sector ?? "")
-                                    ? "Depósitos, costo de crédito, margen financiero, rentabilidad del patrimonio y capital regulatorio. EV/EBITDA no sustituye este análisis."
-                                    : "Ingresos, márgenes, caja, deuda, vencimientos y dilución; contrasta el ciclo del sector antes de extrapolar crecimiento."}
-                            </p>
-                          </div>
-                          {i.cik && i.kind === "stock" ? (
-                            <button
-                              className="fi-button"
-                              disabled={disabled}
-                              onClick={() =>
-                                void post("research", { instrumentId: i.id })
-                              }
-                            >
-                              Consultar publicación SEC
-                            </button>
-                          ) : null}
-                          {research ? (
-                            <div className="fi-facts">
-                              <h4>Datos publicados · {research.source}</h4>
-                              <p className="fi-footnote">
-                                Capturados {date(research.capturedAt)}. Período
-                                y fecha de publicación pueden ser distintos.
-                              </p>
-                              {research.facts.map((fact, n) => (
-                                <article key={`${fact.label}-${fact.end}-${n}`}>
-                                  <strong>{fact.label}</strong>
-                                  <span>
-                                    {new Intl.NumberFormat("es-MX", {
-                                      maximumFractionDigits: 2,
-                                    }).format(fact.value)}{" "}
-                                    {fact.unit}
-                                  </span>
-                                  <small>
-                                    {fact.start ? `${fact.start} a ` : ""}
-                                    {fact.end} · Publicado {fact.filed}
-                                  </small>
-                                  <a
-                                    href={fact.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    {fact.form} · Ver reporte{" "}
-                                    <ArrowUpRight size={11} />
-                                  </a>
-                                </article>
-                              ))}
-                              {research.warnings.map((w, n) => (
-                                <p className="fi-footnote" key={n}>
-                                  {w}
-                                </p>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="fi-footnote">
-                              Los datos fundamentales verificados aparecerán
-                              aquí. Ausencia significa pendiente, no cero.
-                            </p>
-                          )}
-                          <details className="fi-compact">
-                            <summary>Escribir una tesis con fuentes</summary>
-                            <form
-                              onSubmit={(e) => {
-                                const form = e.currentTarget;
-                                const f = fields(e);
-                                void post("thesis", {
-                                  instrumentId: i.id,
-                                  statement: f.statement,
-                                  risks: f.risks,
-                                  invalidators: f.invalidators,
-                                  horizon: f.horizon,
-                                  sources: f.sourceUrl
-                                    ? [
-                                        {
-                                          title:
-                                            f.sourceTitle ||
-                                            "Fuente de la tesis",
-                                          url: f.sourceUrl,
-                                        },
-                                      ]
-                                    : [],
-                                }).then((ok) => {
-                                  if (ok) form.reset();
-                                });
-                              }}
-                            >
-                              <fieldset disabled={disabled}>
-                                <LongText
-                                  label={`Tesis para ${i.symbol}`}
-                                  name="statement"
-                                  required
-                                  hint="Distingue el hecho, el mecanismo de impacto, la variable financiera y lo que todavía es una hipótesis."
-                                />
-                                <LongText
-                                  label={`Riesgos de ${i.symbol}`}
-                                  name="risks"
-                                  required
-                                />
-                                <LongText
-                                  label={`Qué invalidaría la tesis de ${i.symbol}`}
-                                  name="invalidators"
-                                  required
-                                />
-                                <Text
-                                  label={`Horizonte de ${i.symbol}`}
-                                  name="horizon"
-                                  required
-                                />
-                                <Text
-                                  label={`Título de fuente para ${i.symbol}`}
-                                  name="sourceTitle"
-                                />
-                                <Text
-                                  label={`Enlace de fuente para ${i.symbol}`}
-                                  name="sourceUrl"
-                                  type="url"
-                                  required
-                                />
-                                <button
-                                  className="fi-button fi-primary"
-                                  type="submit"
-                                >
-                                  Guardar versión de tesis
-                                </button>
-                              </fieldset>
-                            </form>
-                          </details>
-                          {thesis.map((t, n) => (
-                            <details
-                              className="fi-thesis"
-                              key={t.id}
-                              open={n === 0}
-                            >
-                              <summary>
-                                {n === 0 ? "Última tesis" : "Versión anterior"}{" "}
-                                · {date(t.createdAt)}
-                                <ChevronRight size={12} />
-                              </summary>
-                              <p>{t.statement}</p>
-                              <h4>Riesgos</h4>
-                              <p>{t.risks}</p>
-                              <h4>Qué la invalidaría</h4>
-                              <p>{t.invalidators}</p>
-                              <p className="fi-footnote">
-                                Horizonte: {t.horizon}
-                              </p>
-                              {t.sources.map((s, j) => (
-                                <a
-                                  key={j}
-                                  href={s.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {s.title} <ArrowUpRight size={11} />
-                                </a>
-                              ))}
-                            </details>
-                          ))}
-                        </div>
-                      </details>
-                    );
-                  })}
-                </div>
-              )}
-              <p className="fi-footnote">
-                Seguimiento no es recomendación de compra. Los modelos
-                predictivos y el entrenamiento automático requieren evaluación
-                adicional; no se presentan como una ventaja demostrada.
+            <details className="fi-disclosure fi-auto-archive">
+              <summary>
+                Archivo de notas, tesis y decisiones anteriores{" "}
+                <ChevronRight size={14} />
+              </summary>
+              <p className="fi-hint">
+                Se conservan las versiones guardadas y sus fuentes. Exportar
+                incluye el archivo completo.
               </p>
-            </>
-          ) : null}
-          {tab === "journal" ? (
-            <>
-              <div className="fi-section-heading">
-                <div>
-                  <h2>Las razones también se guardan.</h2>
-                  <p>
-                    Conserva qué sabías al decidir. Una revisión nueva no
-                    reescribe el pasado.
-                  </p>
-                </div>
-              </div>
-              <details className="fi-disclosure">
-                <summary>
-                  Registrar una decisión <Plus size={14} />
-                </summary>
-                <form
-                  onSubmit={(e) => {
-                    const form = e.currentTarget;
-                    const f = fields(e);
-                    void post("decision", f).then((ok) => {
-                      if (ok) form.reset();
-                    });
-                  }}
-                >
-                  <fieldset disabled={disabled}>
-                    <div className="fi-form-grid">
-                      <Text
-                        label="Fecha de la decisión"
-                        name="date"
-                        type="date"
-                        defaultValue={editionFor().date}
-                        required
-                      />
-                      <Text
-                        label="Decisión"
-                        name="decision"
-                        required
-                        placeholder="Por ejemplo: mantener sin cambios"
-                      />
-                    </div>
-                    <LongText
-                      label="Por qué tomé esta decisión"
-                      name="reason"
-                      required
-                    />
-                    <LongText
-                      label="Alternativas consideradas"
-                      name="alternatives"
-                      required
-                    />
-                    <LongText
-                      label="Cuándo volvería a revisarla"
-                      name="revisitWhen"
-                      required
-                    />
-                    <p className="fi-footnote">
-                      Se guardará una captura de la valoración, política,
-                      instrumentos y referencias disponibles ahora. Una fecha
-                      anterior de decisión no reconstruye la información de ese
-                      día.
-                    </p>
-                    <button className="fi-button fi-primary" type="submit">
-                      Guardar decisión
-                    </button>
-                  </fieldset>
-                </form>
-              </details>
+              {data.theses.length ? (
+                <details className="fi-compact">
+                  <summary>Tesis guardadas · {data.theses.length}</summary>
+                  {data.theses.map((thesis) => (
+                    <article className="fi-thesis" key={thesis.id}>
+                      <h3>
+                        {instrument(thesis.instrumentId)?.symbol ??
+                          thesis.instrumentId}
+                      </h3>
+                      <p>{thesis.statement}</p>
+                      <p>Riesgos: {thesis.risks}</p>
+                      <p>Invalidadores: {thesis.invalidators}</p>
+                      <p className="fi-footnote">
+                        {date(thesis.createdAt)} · Horizonte {thesis.horizon}
+                      </p>
+                      {thesis.sources.map((source, i) => (
+                        <a
+                          key={i}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {source.title} <ArrowUpRight size={11} />
+                        </a>
+                      ))}
+                    </article>
+                  ))}
+                </details>
+              ) : null}
+              {data.newsResearch?.reviews.length ? (
+                <details className="fi-compact">
+                  <summary>
+                    Notas de noticias guardadas ·{" "}
+                    {data.newsResearch.reviews.length}
+                  </summary>
+                  {data.newsResearch.reviews.map((review) => (
+                    <article className="fi-thesis" key={review.id}>
+                      <h3>{review.snapshot?.title ?? "Nota conservada"}</h3>
+                      <p>{review.note}</p>
+                      <p>{review.openQuestions}</p>
+                      <p className="fi-footnote">
+                        {date(review.createdAt)} · {review.status}
+                      </p>
+                      {review.snapshot ? (
+                        <a
+                          href={review.snapshot.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Fuente conservada <ArrowUpRight size={11} />
+                        </a>
+                      ) : null}
+                    </article>
+                  ))}
+                </details>
+              ) : null}
+              {data.research.length ? (
+                <details className="fi-compact">
+                  <summary>
+                    Reportes de instrumentos guardados · {data.research.length}
+                  </summary>
+                  {data.research.map((research) => (
+                    <article className="fi-thesis" key={research.id}>
+                      <h3>
+                        {instrument(research.instrumentId)?.symbol ??
+                          research.instrumentId}{" "}
+                        · {research.source}
+                      </h3>
+                      <p className="fi-footnote">
+                        Capturado {date(research.capturedAt)}
+                      </p>
+                      {research.facts.map((fact, i) => (
+                        <p key={i}>
+                          {fact.label}: {fact.value} {fact.unit} · {fact.end} ·{" "}
+                          <a
+                            href={fact.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Reporte
+                          </a>
+                        </p>
+                      ))}
+                    </article>
+                  ))}
+                </details>
+              ) : null}
               {data.decisions.length ? (
                 <div className="fi-decisions">
                   {[...data.decisions]
@@ -1776,16 +1243,11 @@ export function FinanceWorkspace({ demo }: { demo: boolean }) {
                     ))}
                 </div>
               ) : (
-                <div className="fi-empty">
-                  <Check size={26} strokeWidth={1.2} />
-                  <h3>«Sin cambios» también es una decisión.</h3>
-                  <p>
-                    El diario empieza con tus razones, no con una obligación de
-                    operar.
-                  </p>
-                </div>
+                <p className="fi-hint">
+                  No hay decisiones manuales archivadas.
+                </p>
               )}
-            </>
+            </details>
           ) : null}
         </>
       )}

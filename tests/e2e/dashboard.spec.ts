@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { ValidationData } from "../../src/lib/types";
 
 test("briefing, búsqueda, contexto y guardados", async ({ page, isMobile }) => {
   const errors: string[] = [];
@@ -215,59 +216,138 @@ test("archivo automático y categorías de finanzas y operaciones", async ({
   ).toBe(true);
 });
 
-test("investigación y entrevista persisten al recargar", async ({
+test("investigaciones conservadas por API sin formularios ni acceso de entrevistas", async ({
   page,
   isMobile,
 }, testInfo) => {
   await page.goto("/");
-  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: "Entrevistas", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Nueva investigación", exact: true })
-    .click();
-  const title = `Conciliación ${testInfo.project.name}`;
-  await page.getByLabel("Nombre de la investigación").fill(title);
-  await page
-    .getByLabel("Segmento: ¿quién tiene el problema?")
-    .fill("Despachos contables pequeños");
-  await page
-    .getByLabel("Problema concreto")
-    .fill("Dedican horas a comparar facturas manualmente");
-  await page
-    .getByLabel("Hipótesis por comprobar")
-    .fill("Reducir el tiempo de conciliación");
-  await page
-    .getByRole("button", { name: "Guardar investigación", exact: true })
-    .click();
-  await expect(page.getByRole("status")).toContainText("Guardado");
-  await page.getByRole("button", { name: "Añadir entrevista" }).click();
-  await page.getByLabel("Persona o alias").fill("Entrevista de prueba");
-  await page
-    .getByLabel("¿Cómo resolvió el último caso?")
-    .fill("Una hoja de cálculo");
-  await page
-    .getByLabel("Tiempo, costo o consecuencia medible")
-    .fill("Dos horas cada semana");
-  await page
-    .getByLabel("Notas y evidencia que contradice la hipótesis")
-    .fill("Prefiere conservar su herramienta actual");
-  await page
-    .getByRole("button", { name: "Guardar entrevista", exact: true })
-    .click();
-  await expect(page.locator(".interview-card")).toContainText(
-    "Dos horas cada semana",
+  const marker = `${testInfo.project.name}-${Date.now().toString(36)}`;
+  const headers = { Origin: new URL(page.url()).origin };
+  const title = `Conciliación archivada ${marker}`;
+  const projectResponse = await page.request.post("/api/validation", {
+    headers,
+    data: {
+      action: "project",
+      title,
+      segment: "Despachos contables pequeños",
+      problem: "Dedican horas a comparar facturas manualmente",
+      hypothesis: "Reducir el tiempo de conciliación",
+      status: "archived",
+    },
+  });
+  expect(projectResponse.ok()).toBe(true);
+  const { projectId } = await projectResponse.json();
+  expect(typeof projectId).toBe("string");
+  const alias = `Entrevista de prueba ${marker}`;
+  const interviewResponse = await page.request.post("/api/validation", {
+    headers,
+    data: {
+      action: "interview",
+      projectId,
+      alias,
+      date: "2026-11-01",
+      currentSolution: "Una hoja de cálculo",
+      consequence: "Dos horas cada semana",
+      notes: "Prefiere conservar su herramienta actual",
+      status: "completed",
+    },
+  });
+  expect(interviewResponse.ok()).toBe(true);
+  const beforeResponse = await page.request.get("/api/validation");
+  expect(beforeResponse.ok()).toBe(true);
+  const before: ValidationData = await beforeResponse.json();
+  const project = before.projects.find((item) => item.id === projectId);
+  const interview = before.interviews.find(
+    (item) => item.projectId === projectId && item.alias === alias,
   );
+  expect(project).toMatchObject({ title, status: "archived" });
+  expect(interview).toMatchObject({
+    consequence: "Dos horas cada semana",
+    notes: "Prefiere conservar su herramienta actual",
+  });
+
   await page.reload();
   if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: "Entrevistas", exact: true }).click();
+  await page.getByRole("button", { name: /^Oportunidades/ }).click();
+  await expect(
+    page.locator(".validation-workspace, .interview-form"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Archivo de investigaciones anteriores", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: /Entrevistas|Nueva investigación|Abrir archivo de investigaciones|Preparar entrevistas|Añadir entrevista/,
+    }),
+  ).toHaveCount(0);
   await page
-    .locator(".project-list")
-    .getByRole("button")
-    .filter({ hasText: title })
+    .getByText("Radar de problemas · evidencia y cobertura", { exact: true })
     .click();
-  await expect(page.locator(".interview-card")).toContainText(
-    "Prefiere conservar su herramienta actual",
+  await expect(
+    page.getByRole("region", { name: "Radar de evidencia" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /Llevar a Entrevistas|Preparar entrevistas/,
+    }),
+  ).toHaveCount(0);
+  const afterResponse = await page.request.get("/api/validation");
+  expect(afterResponse.ok()).toBe(true);
+  const after: ValidationData = await afterResponse.json();
+  expect(after.projects.find((item) => item.id === projectId)).toEqual(project);
+  expect(after.interviews.find((item) => item.id === interview?.id)).toEqual(
+    interview,
   );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("navegación con cuatro destinos y Radar secundario", async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto("/?demo=1");
+  if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
+  const navigation = page.getByRole("navigation", {
+    name: "Navegación principal",
+  });
+  await expect(navigation.getByRole("button")).toHaveCount(4);
+  for (const name of [
+    "Mi briefing",
+    "Mi portafolio",
+    "Oportunidades",
+    "Guardados",
+  ])
+    await expect(
+      navigation.getByRole("button", { name: new RegExp(`^${name}`) }),
+    ).toBeVisible();
+  await expect(
+    navigation.getByRole("button", { name: /Entrevistas|Radar/ }),
+  ).toHaveCount(0);
+  await navigation.getByRole("button", { name: /^Oportunidades/ }).click();
+  await expect(
+    page.getByText("Archivo de investigaciones anteriores", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(".validation-workspace, .interview-form"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "Radar de evidencia" }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /Preparar entrevistas|Llevar a Entrevistas/,
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByText("Radar de problemas · evidencia y cobertura", { exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Radar de evidencia" }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

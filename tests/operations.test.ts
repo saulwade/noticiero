@@ -83,22 +83,21 @@ describe("registro operativo", () => {
       schema.operationAlerts,
       schema.financeSync,
       schema.financeInstruments,
+      schema.financeProfiles,
     ])
       await db.delete(table);
     const captured = new Date().toISOString();
-    await db
-      .insert(schema.financeSync)
-      .values({
+    await db.insert(schema.financeSync).values({
+      id: "news-research",
+      data: {
         id: "news-research",
-        data: {
-          id: "news-research",
-          label: "Investigación financiera",
-          provider: "Motor local",
-          status: "ok",
-          message: "Fixture",
-          lastSuccess: captured,
-        },
-      });
+        label: "Investigación financiera",
+        provider: "Motor local",
+        status: "ok",
+        message: "Fixture",
+        lastSuccess: captured,
+      },
+    });
     await db.insert(schema.financeSync).values({
       id: "fx:USD/MXN",
       data: {
@@ -111,6 +110,49 @@ describe("registro operativo", () => {
         asOf: captured.slice(0, 10),
       },
     });
+  });
+  it("avisa si falta el análisis automático de un perfil configurado y se resuelve al recuperarlo", async () => {
+    const db = await getDb();
+    const at = new Date().toISOString();
+    await db
+      .insert(schema.financeProfiles)
+      .values({
+        id: "health-profile",
+        data: {
+          id: "health-profile",
+          version: 1,
+          initialCapitalMxn: "12000",
+          monthlyContributionMxn: "300",
+          horizonYears: 12,
+          riskPreference: "unconfirmed",
+          reserveExcluded: true,
+          broker: { name: "Ejemplo", verified: false },
+          updatedAt: at,
+        },
+      });
+    expect(
+      (await reconcileOperations()).alerts.some(
+        (a) => a.id === "finance-automatic-analysis",
+      ),
+    ).toBe(true);
+    await db
+      .insert(schema.financeSync)
+      .values({
+        id: "automatic-analysis",
+        data: {
+          id: "automatic-analysis",
+          label: "Análisis",
+          provider: "Python",
+          status: "ok",
+          message: "Fixture",
+          lastSuccess: at,
+        },
+      });
+    expect(
+      (await reconcileOperations()).alerts.some(
+        (a) => a.id === "finance-automatic-analysis",
+      ),
+    ).toBe(false);
   });
   it("deduplica y resuelve el aviso después de recuperar el servicio", async () => {
     const first = await reconcileOperations();

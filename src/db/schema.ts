@@ -1,4 +1,10 @@
 import type {
+  AutomationProfile,
+  AutomationHistory,
+  AutomationInput,
+  AutomationReport,
+} from "@/features/finance/automatic-types";
+import type {
   FinanceNewsEvent,
   FinanceNewsReview,
   FinanceNewsBrief,
@@ -46,6 +52,22 @@ import type {
   FinanceSyncState,
 } from "@/features/finance/types";
 
+export const financeProfiles = pgTable("finance_profiles", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<AutomationProfile>().notNull(),
+});
+export const financeHistories = pgTable("finance_histories", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<AutomationHistory>().notNull(),
+});
+export const financeAutomationInputs = pgTable("finance_automation_inputs", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<AutomationInput>().notNull(),
+});
+export const financeAnalyses = pgTable("finance_analyses", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<AutomationReport>().notNull(),
+});
 export const financeNewsEvents = pgTable("finance_news_events", {
   id: text("id").primaryKey(),
   data: jsonb("data").$type<FinanceNewsEvent>().notNull(),
@@ -205,6 +227,10 @@ export const backupRuns = pgTable("backup_runs", {
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
   ...[
+    "finance_profiles",
+    "finance_histories",
+    "finance_automation_inputs",
+    "finance_analyses",
     "finance_news_events",
     "finance_news_reviews",
     "finance_news_briefs",

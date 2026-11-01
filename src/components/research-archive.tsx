@@ -11,7 +11,7 @@ export function ResearchArchive({
 }: {
   research: ResearchData;
   query: string;
-  onValidate: (id: string, eventId?: string) => void;
+  onValidate?: (id: string, eventId?: string) => void;
   demo: boolean;
 }) {
   const [days, setDays] = useState(3);
@@ -143,13 +143,15 @@ export function ResearchArchive({
                 </div>
               ))}
             </details>
-            <button
-              className="small-button"
-              onClick={() => onValidate(event.opportunityId, event.id)}
-            >
-              <MessageSquare size={14} />
-              Preparar entrevistas
-            </button>
+            {onValidate ? (
+              <button
+                className="small-button"
+                onClick={() => onValidate(event.opportunityId, event.id)}
+              >
+                <MessageSquare size={14} />
+                Preparar entrevistas
+              </button>
+            ) : null}
           </article>
         ))
       ) : (

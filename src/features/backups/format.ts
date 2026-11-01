@@ -7,6 +7,10 @@ import {
 import { gzipSync, gunzipSync } from "node:zlib";
 
 export const backupColumns: Record<string, string[]> = {
+  finance_profiles: ["id", "data"],
+  finance_histories: ["id", "data"],
+  finance_automation_inputs: ["id", "data"],
+  finance_analyses: ["id", "data"],
   finance_news_events: ["id", "data"],
   finance_news_reviews: ["id", "data"],
   finance_news_briefs: ["id", "data"],
@@ -64,7 +68,7 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
     data.version !== 1 ||
     !Number.isFinite(Date.parse(data.createdAt)) ||
     !Array.isArray(data.tables) ||
-    ![22, 26, 33, 34, Object.keys(backupColumns).length].includes(
+    ![22, 26, 33, 34, 37, Object.keys(backupColumns).length].includes(
       data.tables.length,
     )
   )
@@ -102,8 +106,19 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
       }
     }
   }
-  const required = Object.keys(backupColumns).filter((name) =>
-    data.tables.length === 22
+  const automatic = new Set([
+    "finance_profiles",
+    "finance_histories",
+    "finance_automation_inputs",
+    "finance_analyses",
+  ]);
+  const required = Object.keys(backupColumns).filter((name) => {
+    if (
+      data.tables.length < Object.keys(backupColumns).length &&
+      automatic.has(name)
+    )
+      return false;
+    return data.tables.length === 22
       ? !name.startsWith("evidence_") && !name.startsWith("finance_")
       : data.tables.length === 26
         ? !name.startsWith("finance_")
@@ -111,8 +126,8 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
           ? name !== "finance_sync" && !name.startsWith("finance_news_")
           : data.tables.length === 34
             ? !name.startsWith("finance_news_")
-            : true,
-  );
+            : true;
+  });
   if (required.some((name) => !names.has(name)))
     throw new Error("Faltan tablas de respaldo.");
   return data;

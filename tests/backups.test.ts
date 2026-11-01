@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import {
   backupColumns,
   backupManifest,
+  validateSnapshot,
   openBackup,
   sealBackup,
   type BackupSnapshot,
@@ -45,6 +46,29 @@ const snapshot = (): BackupSnapshot => ({
   })),
 });
 describe("respaldo independiente cifrado", () => {
+  it("acepta el esquema completo anterior de 37 tablas y rechaza una mezcla parcial", () => {
+    const automatic = new Set([
+      "finance_profiles",
+      "finance_histories",
+      "finance_automation_inputs",
+      "finance_analyses",
+    ]);
+    const old = snapshot();
+    old.tables = old.tables.filter((t) => !automatic.has(t.name));
+    expect(old.tables).toHaveLength(37);
+    expect(() => validateSnapshot(old)).not.toThrow();
+    const mixed = snapshot();
+    mixed.tables = mixed.tables.filter(
+      (t) =>
+        ![
+          "finance_profiles",
+          "finance_histories",
+          "finance_automation_inputs",
+          "finance_news_events",
+        ].includes(t.name),
+    );
+    expect(() => validateSnapshot(mixed)).toThrow();
+  });
   it("cubre todas las tablas de contenido y excluye las credenciales y leases", () => {
     const tables = migrations
       .map((sql) => sql.match(/EXISTS (\w+)/)?.[1])

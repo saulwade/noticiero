@@ -222,10 +222,18 @@ describe("archivo financiero independiente y auditable", () => {
       name,
       rows: [],
     }));
+    const automatic = new Set([
+      "finance_profiles",
+      "finance_histories",
+      "finance_automation_inputs",
+      "finance_analyses",
+    ]);
+    const previous = tables.filter((t) => !automatic.has(t.name));
     for (const set of [
       tables,
-      tables.filter((t) => !t.name.startsWith("finance_news_")),
-      tables.filter(
+      previous,
+      previous.filter((t) => !t.name.startsWith("finance_news_")),
+      previous.filter(
         (t) => !t.name.startsWith("finance_news_") && t.name !== "finance_sync",
       ),
       tables.filter((t) => !t.name.startsWith("finance_")),

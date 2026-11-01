@@ -274,15 +274,23 @@ describe("archivo de investigación financiera sin cartera", () => {
     expect(state?.status).toBe("ok");
     expect(state?.lastSuccess).toBe(at);
   });
-  it("los backups aceptan archivos completos22/26/33/34/37 y rechazan mezcla parcial", () => {
+  it("los backups aceptan archivos completos22/26/33/34/37/41 y rechazan mezcla parcial", () => {
     const tables = Object.keys(backupColumns).map((name) => ({
       name,
       rows: [],
     }));
+    const automatic = new Set([
+      "finance_profiles",
+      "finance_histories",
+      "finance_automation_inputs",
+      "finance_analyses",
+    ]);
+    const previous = tables.filter((t) => !automatic.has(t.name));
     const sets = [
       tables,
-      tables.filter((t) => !t.name.startsWith("finance_news_")),
-      tables.filter(
+      previous,
+      previous.filter((t) => !t.name.startsWith("finance_news_")),
+      previous.filter(
         (t) => !t.name.startsWith("finance_news_") && t.name !== "finance_sync",
       ),
       tables.filter((t) => !t.name.startsWith("finance_")),
@@ -291,7 +299,7 @@ describe("archivo de investigación financiera sin cartera", () => {
           !t.name.startsWith("finance_") && !t.name.startsWith("evidence_"),
       ),
     ];
-    expect(sets.map((t) => t.length)).toEqual([37, 34, 33, 26, 22]);
+    expect(sets.map((t) => t.length)).toEqual([41, 37, 34, 33, 26, 22]);
     for (const set of sets)
       expect(
         validateSnapshot({

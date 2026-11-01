@@ -2,8 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function openRadar(page: Page, isMobile: boolean) {
   if (isMobile) await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: /^Oportunidades/ }).click();
   await page
-    .getByRole("button", { name: "Radar de problemas", exact: true })
+    .getByText("Radar de problemas · evidencia y cobertura", { exact: true })
     .click();
   await expect(
     page.getByRole("region", { name: "Radar de evidencia" }),
@@ -76,7 +77,7 @@ test("radar vacío, filtros, cobertura y exportación en escritorio y teléfono"
   expect(errors).toEqual([]);
 });
 
-test("CSV explícito, revisión persistente y ficha vinculada a Entrevistas", async ({
+test("CSV explícito y revisión persistente dentro de Oportunidades", async ({
   page,
   isMobile,
 }, testInfo) => {
@@ -181,17 +182,12 @@ test("CSV explícito, revisión persistente y ficha vinculada a Entrevistas", as
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await dossier.getByRole("button", { name: "Llevar a Entrevistas" }).click();
-  await expect(page.locator(".validation-workspace")).toBeVisible();
   await expect(
-    page.locator(".validation-detail .validation-sources"),
-  ).toContainText(issue);
-  await expect(
-    page.locator(".validation-detail").getByRole("heading", {
-      name: "Cobros, pagos y devoluciones",
-      exact: true,
-    }),
-  ).toBeVisible();
+    dossier.getByRole("button", { name: "Llevar a Entrevistas" }),
+  ).toHaveCount(0);
+  expect(writes.every((write) => JSON.parse(write).action !== "project")).toBe(
+    true,
+  );
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

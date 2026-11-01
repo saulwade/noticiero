@@ -1,4 +1,5 @@
 import { assertFinanceCapacity } from "./capacity";
+import { getAutomationWorkspace } from "./automatic-service";
 import {
   getFinanceNewsWorkspace,
   saveFinanceNewsReview,
@@ -58,7 +59,7 @@ async function load(reader: Reader, now = new Date()): Promise<FinanceData> {
       alphaVantageConfigured: Boolean(alphaVantageKey()),
       expectedPriceSession: expectedUsClose(now),
       sources: sync
-        .filter((r) => r.id !== "news-research")
+        .filter((r) => !["news-research", "automatic-analysis"].includes(r.id))
         .map((r) => {
           const { leaseToken: _, leaseUntil: __, ...state } = r.data; // eslint-disable-line @typescript-eslint/no-unused-vars
           return state;
@@ -138,6 +139,7 @@ export function boundedFinanceView(data: FinanceData): FinanceData {
     result.movements,
     result.marks,
     result.research,
+    ...(result.automation ? [result.automation.history] : []),
     ...(result.newsResearch
       ? [
           result.newsResearch.reviews,
@@ -157,6 +159,7 @@ export function boundedFinanceView(data: FinanceData): FinanceData {
 export async function getFinanceData(full = false, now = new Date()) {
   const db = await getDb();
   const data = await load(db, now);
+  data.automation = await getAutomationWorkspace(now, full);
   if (data.instruments.length) {
     const articles = (await db.select().from(storedStories))
       .map((r) => r.data)

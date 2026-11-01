@@ -127,7 +127,7 @@ export function EvidenceWorkspace({
   data: EvidenceData;
   demo: boolean;
   onRefresh: () => Promise<void>;
-  onProject: (projectId: string) => void;
+  onProject?: (projectId: string) => void;
 }) {
   const [tab, setTab] = useState<"problems" | "records" | "reports">(
     "problems",
@@ -206,7 +206,7 @@ export function EvidenceWorkspace({
           throw new Error(
             "La investigación se guardó, pero no recibimos su identificador. Actualiza la página y revisa Entrevistas.",
           );
-        onProject(result.projectId);
+        onProject?.(result.projectId);
       } else {
         await onRefresh();
       }
@@ -542,12 +542,15 @@ export function EvidenceWorkspace({
                   "Revisión guardada. Tu criterio queda vinculado a la evidencia.",
                 )
               }
-              onProject={() =>
-                void persist(
-                  { action: "project", dossierId: dossier.id },
-                  `project:${dossier.id}`,
-                  "Investigación lista en Entrevistas.",
-                )
+              onProject={
+                onProject
+                  ? () =>
+                      void persist(
+                        { action: "project", dossierId: dossier.id },
+                        `project:${dossier.id}`,
+                        "Investigación lista en Entrevistas.",
+                      )
+                  : undefined
               }
             />
           ))}
@@ -742,7 +745,7 @@ function Dossier({
   disabled: boolean;
   busy: string;
   onReview: (id: string, decision: Decision, note: string) => Promise<boolean>;
-  onProject: () => void;
+  onProject?: () => void;
 }) {
   return (
     <details className="ev-dossier">
@@ -881,7 +884,7 @@ function Dossier({
             {dossier.experiment ||
               "Definir un experimento con personas del segmento antes de construir."}
           </p>
-          <h3>Preguntas para la entrevista</h3>
+          <h3>Preguntas para contrastar</h3>
           {dossier.questions.length ? (
             <ol>
               {dossier.questions.map((question, index) => (
@@ -894,17 +897,19 @@ function Dossier({
               consecuencia tuvo?
             </p>
           )}
-          <button
-            className="ev-button ev-primary"
-            disabled={disabled}
-            onClick={onProject}
-          >
-            <MessageSquare size={15} />
-            {busy === `project:${dossier.id}`
-              ? "Abriendo investigación…"
-              : "Llevar a Entrevistas"}
-            <ArrowUpRight size={14} />
-          </button>
+          {onProject ? (
+            <button
+              className="ev-button ev-primary"
+              disabled={disabled}
+              onClick={onProject}
+            >
+              <MessageSquare size={15} />
+              {busy === `project:${dossier.id}`
+                ? "Abriendo investigación…"
+                : "Llevar a Entrevistas"}
+              <ArrowUpRight size={14} />
+            </button>
+          ) : null}
         </section>
         <section className="ev-block">
           <h3>Citas y revisión humana</h3>

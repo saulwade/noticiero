@@ -26,7 +26,7 @@ export function ResearchWorkspace({
   children: React.ReactNode;
   onNote: (id: string, note: string, state: SavedItem["state"]) => void;
   onReport: () => Promise<void>;
-  onValidate: (id: string, eventId?: string) => void;
+  onValidate?: (id: string, eventId?: string) => void;
 }) {
   const [tab, setTab] = useState<"ideas" | "notes" | "reports" | "archive">(
     "ideas",

@@ -6,6 +6,7 @@ import {
   evidenceConnectors,
   financeSync,
   financeInstruments,
+  financeProfiles,
 } from "@/db/schema";
 import { financeSyncFindings } from "@/features/finance/daily-sync";
 import { healthFindings } from "./health";
@@ -13,15 +14,23 @@ import type { BackupRun, OperationAlert, OperationsData } from "@/lib/types";
 import { z } from "zod";
 export async function getOperationsData(): Promise<OperationsData> {
   const db = await getDb();
-  const [runs, backups, alerts, connectors, financialStates, instruments] =
-    await Promise.all([
-      db.select().from(jobs),
-      db.select().from(backupRuns),
-      db.select().from(operationAlerts),
-      db.select().from(evidenceConnectors),
-      db.select().from(financeSync),
-      db.select().from(financeInstruments),
-    ]);
+  const [
+    runs,
+    backups,
+    alerts,
+    connectors,
+    financialStates,
+    instruments,
+    profiles,
+  ] = await Promise.all([
+    db.select().from(jobs),
+    db.select().from(backupRuns),
+    db.select().from(operationAlerts),
+    db.select().from(evidenceConnectors),
+    db.select().from(financeSync),
+    db.select().from(financeInstruments),
+    db.select().from(financeProfiles),
+  ]);
   const backup = backups
     .map((row) => row.data)
     .sort((a, b) => b.at.localeCompare(a.at))[0];
@@ -39,6 +48,21 @@ export async function getOperationsData(): Promise<OperationsData> {
       instruments.map((r) => r.data),
     ),
   );
+  if (profiles.length) {
+    const analysis = financialStates.find(
+      (r) => r.id === "automatic-analysis",
+    )?.data;
+    if (
+      !analysis?.lastSuccess ||
+      analysis.status === "error" ||
+      Date.now() - Date.parse(analysis.lastSuccess) > 36 * 3600000
+    )
+      current.push({
+        id: "finance-automatic-analysis",
+        message:
+          "Finanzas: falta confirmar el análisis cuantitativo automático. Se conserva la propuesta anterior.",
+      });
+  }
   const now = new Date().toISOString();
   for (const row of connectors) {
     if (row.data.status === "error" || row.data.blocked)
