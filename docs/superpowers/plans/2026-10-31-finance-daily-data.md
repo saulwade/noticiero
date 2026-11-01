@@ -25,7 +25,7 @@
 - [x] **3. Persistencia y respaldo.** Añadir `FinanceSyncState`, tabla y migración aditiva; ampliar backup y validación legacy sin aceptar esquemas mezclados. Leer estado en GET financiero privado; exportarlo. Ampliar el límite de referencias de forma explícita. Probar captura/restauración del esquema de 34 tablas y compatibilidad con 33.
 - [x] **4. Programación y alertas.** Integrar etapa financiera en `src/workflows/update-edition.ts` y actualización local, conservando cron existente. Manejar fallos del módulo de manera aislada y comprobarlos en `src/features/operations/service.ts`; el monitor de GitHub existente avisará de fallos reales, sin inventar mensajes por mercado cerrado.
 - [x] **5. Interfaz y guía.** Componente pequeño `src/components/finance-daily-status.tsx`, sin nuevo botón por cotización: fecha, proveedor, cobertura y última actualización. Detalle desplegable para incidencias y guía de primer uso/mensual/revisión. Estado inicial sin urgencia de registrar dinero. Documentar proceso de aportaciones en el plan privado, sin publicar cifras personales en UI ni repositorio.
-- [ ] **6. Verificación de entrega.** Ejecutar `npm test`, `npm run lint`, `npm run typecheck`, las pruebas Python, `npm run build` y `npm run test:e2e`. Smoke público de FX y cotización con clave propia si está disponible; nunca considerar demo equivalente a producción. Confirmar secretos fuera de diff y preservar regresiones de noticias/oportunidades. Hacer respaldo previo, publicar por Git, comprobar Ready, interfaz real y ciclo automático; respaldo posterior y restauración temporal comparada. Registrar resultados y bloqueos de credenciales honestamente.
+- [x] **6. Verificación previa de entrega.** Ejecutar `npm test`, `npm run lint`, `npm run typecheck`, las pruebas Python, `npm run build` y `npm run test:e2e`. Smoke público de FX y cotización con clave propia si está disponible; nunca considerar demo equivalente a producción. Confirmar secretos fuera de diff y preservar regresiones de noticias/oportunidades. Registrar resultados y bloqueos de credenciales honestamente.
 
 ## Fuentes verificadas
 
@@ -39,4 +39,9 @@
 
 230 pruebas de lógica/integración, 8 de Python y 30 E2E de escritorio/teléfono pasaron; lint, TypeScript y build Webpack correctos. Revisión independiente sin bloqueos después de corregir recuperación nocturna de FX cuando la mañana devuelve un dato anterior, y normalización compartida de claves demo/blancas. Los datos completos de precio se reutilizan en el panel únicamente cuando cambio y porcentaje proceden del proveedor; no se inventan variaciones. Los registros financieros permanecen independientes.
 
-Prueba pública real Frankfurter correcta por fecha CDMX. Activación de Alpha Vantage pendiente de clave propia gratuita y prueba real, sin equiparar fixtures a cobertura del proveedor. El cierre de producción se registra en el plan privado para evitar publicar datos de cuenta o credenciales.
+Prueba pública real Frankfurter correcta por fecha CDMX. Clave gratuita propia emitida con aprobación del usuario y prueba real de GLOBAL_QUOTE de IBM correcta para la sesión 2026-10-30, incluyendo precio, cambio y porcentaje genuinos. El smoke no creó posiciones ni movimientos. La clave se configura como secreto sensible de servidor; no se publica su valor. El cierre de producción se registra en el plan privado para evitar publicar datos de cuenta o credenciales.
+
+
+## Condición de publicación
+
+Respaldo previo confirmado, publicación por Git, Ready, interfaz real y ciclo automático; luego respaldo posterior y restauración temporal comparada. El registro de esos resultados se mantiene en el plan privado. La programación automática conserva los horarios existentes; la cuenta real permanece vacía hasta que el usuario acuerde su portafolio inicial.
