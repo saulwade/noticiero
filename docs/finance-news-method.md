@@ -1,12 +1,14 @@
 # Método local de investigación financiera · fase 2B
 
-El motor `finance-news-v1` transforma noticias ya recopiladas en fichas para investigar. No consulta Internet, llama APIs de IA, descarga modelos, crea posiciones ni recomienda compras o ventas. Clasificar un texto no verifica su contenido ni estima la rentabilidad de una acción.
+El motor `finance-news-v2` transforma noticias ya recopiladas en fichas para investigar. No consulta Internet, llama APIs de IA, descarga modelos, crea posiciones ni recomienda compras o ventas. Clasificar un texto no verifica su contenido ni estima la rentabilidad de una acción.
 
 ## Entradas y selección
 
 Se usan el título original, hasta 3,000 caracteres de texto disponible, fecha de publicación, fuente, URL, categoría y relaciones explícitas guardadas por Noticiero. Se rechazan fechas inválidas/futuras, enlaces que no sean HTTPS públicos y enlaces con credenciales embebidas. Las imágenes conservan únicamente una URL pública; el motor no las descarga.
 
 La selección favorece noticias financieras y empresariales concretas: resultados, regulación/litigios, seguridad/continuidad, financiación, adquisiciones, infraestructura, macroeconomía y productos/precios/contratos. Una empresa registrada no es requisito; por ejemplo, se admite una decisión macroeconómica oficial sin ticker conocido. Las noticias comunitarias marcadas como pregunta, comentario, proyecto o investigación editorial quedan fuera de este flujo; el Radar de problemas conserva sus criterios propios. Se filtran promociones y reseñas personales evidentes.
+
+La versión v2 filtra listas promocionales numeradas y guías operativas evergreen cuando su título/extracto ofrece herramientas, consejos o promesas de crecimiento sin un hecho publicado concreto. «Revenue growth» en una invitación de marketing no constituye un resultado financiero. El filtro se comparte entre la creación de fichas y la selección actual del archivo: las copias v1 permanecen conservadas, pero dejan de mostrarse o contarse en informes nuevos. Se preservan noticias numeradas con hechos explícitos y explicadores financieros con contenido específico. El patrón operativo inglés se limita a «How to»; un análisis «How Microsoft’s sales doubled…» no se excluye por comenzar con «How». La clasificación de seguridad reconoce hackers, robo de fondos/activos y crypto heists para que adquirir tokens de reposición no se interprete como adquirir una empresa.
 
 Las empresas se reconocen con el catálogo existente y contexto textual. No se inventan nombres, mercados o tickers para empresas desconocidas. Apple, Amazon y Meta tienen controles para evitar confundir fruta, geografía o metaanálisis con empresas. Estos controles preservan litigios, resultados e inversiones cuando hay contexto corporativo. El reconocimiento sigue siendo una heurística: puede omitir empresas y equivocarse con contextos ambiguos.
 

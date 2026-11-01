@@ -476,3 +476,127 @@ describe("revision observada en el mismo instante", () => {
     expect(selectLatestFinanceEvents([latest, old])[0].id).toBe("a-new");
   });
 });
+
+describe("selección financiera v2 frente a guías promocionales", () => {
+  const guideTitle = "7 Top Lead Scoring Software Solutions";
+  const guideExcerpt =
+    "Discover the top 7 lead scoring software solutions to enhance your sales strategy. Learn how these powerful tools can help you prioritize leads, boost conversions, and drive revenue growth.";
+  it("excluye la lista promocional real aunque su extracto diga revenue growth", () => {
+    expect(
+      buildFinanceNewsEvent(
+        story({
+          title: guideTitle,
+          excerpt: guideExcerpt,
+          companies: [],
+          category: "Operaciones",
+          sourceId: "smallbiz",
+          sourceName: "Small Business Trends",
+        }),
+        now,
+      ),
+    ).toBeUndefined();
+  });
+  it("no muestra ni cuenta en un informe nuevo la ficha v1 ya archivada de esa lista", () => {
+    const legacy = {
+      ...event(),
+      title: guideTitle,
+      excerpt: guideExcerpt,
+      summary: guideExcerpt,
+      engineVersion: "finance-news-v1",
+      companies: [],
+      category: "Operaciones" as const,
+    };
+    const retained = structuredClone(legacy);
+    expect(selectLatestFinanceEvents([legacy])).toEqual([]);
+    expect(buildFinanceNewsBrief([legacy], [], now).eventCount).toBe(0);
+    expect(legacy).toEqual(retained);
+  });
+  it("no resucita una versión anterior si la última del mismo artículo es una guía excluida", () => {
+    const previous = event();
+    const latest = {
+      ...previous,
+      id: "latest-guide",
+      title: guideTitle,
+      excerpt: guideExcerpt,
+      capturedAt: "2026-10-31T23:01:00Z",
+      engineVersion: "finance-news-v1",
+    };
+    expect(selectLatestFinanceEvents([previous, latest])).toEqual([]);
+  });
+  it("excluye una guía evergreen de marketing sin convertir sus objetivos en resultados publicados", () => {
+    expect(
+      buildFinanceNewsEvent(
+        story({
+          title: "How to Use Lead Scoring Software to Increase Revenue",
+          excerpt:
+            "Learn how lead scoring software can help your sales team prioritize prospects. Discover the best tools to boost conversions and drive revenue growth.",
+          companies: [],
+          category: "Operaciones",
+        }),
+        now,
+      ),
+    ).toBeUndefined();
+  });
+  it("preserva el análisis de los resultados reales de ventas de Microsoft", () => {
+    const result = buildFinanceNewsEvent(
+      story({
+        title: "How Microsoft’s cloud sales doubled in the latest quarter",
+        excerpt:
+          "The quarterly filing shows cloud revenue of $20 billion and operating profit of $5 billion. Cloud sales doubled compared with the same quarter last year, while costs increased.",
+        companies: ["MSFT"],
+        category: "Finanzas",
+      }),
+      now,
+    );
+    expect(result?.eventKind).toBe("earnings");
+    expect(result?.companies.some((c) => c.symbol === "MSFT")).toBe(true);
+  });
+  it("preserva el análisis de crecimiento de ventas de Amazon en Q3", () => {
+    const result = buildFinanceNewsEvent(
+      story({
+        title: "How Amazon’s sales grew 12 percent in Q3",
+        excerpt:
+          "Amazon's quarterly filing lists revenue growth of 12 percent in Q3 and operating profit of $8 billion. The filing also includes the costs of its retail and cloud businesses.",
+        companies: ["AMZN"],
+        category: "Finanzas",
+      }),
+      now,
+    );
+    expect(result?.eventKind).toBe("earnings");
+    expect(result?.companies.some((c) => c.symbol === "AMZN")).toBe(true);
+  });
+  it("trata el robo de criptoactivos y su reposición como seguridad, no como adquisición", () => {
+    const crypto = event({
+      title:
+        "Binance CEO says 90 percent of stolen assets have been ‘replenished’",
+      excerpt:
+        "After hackers stole a shocking $6.3 billion from Binance customers in a record-breaking crypto heist, the company said most assets have been replenished. The remaining 10 percent consists of less liquid tokens which may take longer to acquire.",
+      companies: [],
+      category: "Finanzas",
+    });
+    expect(crypto.eventKind).toBe("security");
+  });
+  it("preserva noticias numeradas de resultados y explicadores financieros con contenido", () => {
+    const earnings = buildFinanceNewsEvent(
+      story({
+        title: "5 companies report earnings as cloud revenue grows",
+        excerpt:
+          "Microsoft and four other companies reported earnings for the quarter. Microsoft disclosed revenue growth of 12 percent and published the financial report.",
+        companies: ["MSFT"],
+      }),
+      now,
+    );
+    expect(earnings?.eventKind).toBe("earnings");
+    const explainer = buildFinanceNewsEvent(
+      story({
+        title: "How to Evaluate Bond ETF Duration and Fees",
+        excerpt:
+          "Learn how duration and fees affect a bond ETF. A fund with duration of 5 years may lose approximately 5 percent in price when yields rise by one percentage point, before other effects. The expense ratio reduces the amount retained by investors.",
+        companies: [],
+        category: "Finanzas",
+      }),
+      now,
+    );
+    expect(explainer).toBeDefined();
+  });
+});

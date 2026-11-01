@@ -40,6 +40,8 @@
 
 ## Verificación previa y condición de publicación
 
-Pasaron 282 pruebas de lógica/integración en 26 archivos, 8 Python, lint, TypeScript, build Webpack y 32 E2E de escritorio/teléfono. La revisión corrigió menciones Apple/Amazon, identidad de metadatos, notas fuera de la vista, recuperación histórica por cursor y estado de fallo concurrente. Se verificó la reversión A→B→A y el desempate por revisión con el mismo instante, sin reescribir reportes anteriores.
+Pasaron 290 pruebas de lógica/integración en 26 archivos, 8 Python, lint, TypeScript, build Webpack y 32 E2E de escritorio/teléfono. La revisión corrigió menciones Apple/Amazon, identidad de metadatos, notas fuera de la vista, recuperación histórica por cursor y estado de fallo concurrente. Se verificó la reversión A→B→A y el desempate por revisión con el mismo instante, sin reescribir reportes anteriores.
+
+La comprobación real añadió regresiones para excluir una lista comercial, clasificar un robo de criptomonedas y preservar noticias narrativas de resultados de Microsoft/Amazon. El motor v2 filtra la selección actual sin borrar el archivo previo.
 
 Respaldo previo confirmado. La publicación por Git exige después Ready, ciclo real, fichas/informe persistidos con cartera vacía, respaldo posterior y restauración comparada. El cierre se registra en el plan privado sin subir datos personales a Git.

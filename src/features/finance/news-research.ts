@@ -19,7 +19,7 @@ import type {
   FinancialEventKind,
 } from "./research-types";
 
-export const FINANCE_NEWS_ENGINE_VERSION = "finance-news-v1";
+export const FINANCE_NEWS_ENGINE_VERSION = "finance-news-v2";
 const normalize = (text: string) =>
   text
     .toLowerCase()
@@ -53,7 +53,7 @@ const kinds: {
     kind: "security",
     topic: "Seguridad y continuidad",
     pattern:
-      /\b(breach\w*|hacked|ransomware|malware|fraud\w*|cyberattack\w*|ciberataque\w*|filtracion\w*|hackeo\w*)\b/,
+      /\b(breach\w*|hacked|hackers?|crypto heist|stolen (?:assets|funds)|ransomware|malware|fraud\w*|cyberattack\w*|ciberataque\w*|filtracion\w*|hackeo\w*)\b/,
     hypothesis:
       "Si el incidente afecta operaciones o contratos, podría generar costos o pérdida de clientes; la mención por sí sola no cuantifica daños ni demuestra impacto bursátil.",
     questions: [
@@ -168,6 +168,62 @@ const promotional =
   /\b(register now|get tickets|days? left|gift cards?|best .{0,30}deals?|coupon\w*|subscribe to|sign up for|sponsored|registra\w* ahora|compra tus boletos|ultimos dias|suscribete|descuentos exclusivos)\b/;
 const personalReview =
   /^(?:i (?:built|tried|made)|my .{0,30}(?:setup|keyboard)|keyboards of|staff picks|what i use|how i built)/;
+// Reapply these text-level gates to archived versions too: preserve the raw
+// history while preventing an old promotional guide from remaining current.
+function eligibleSourceText(
+  source: Pick<FinanceNewsEvent, "title" | "excerpt" | "sourceId">,
+) {
+  const title = normalize(source.title),
+    excerpt = normalize(source.excerpt);
+  if (
+    /^(?:ask-hn|show-hn|yc-rfs)$/.test(source.sourceId) ||
+    /^(?:ask hn|show hn|tell hn):/.test(title) ||
+    promotional.test(title) ||
+    personalReview.test(title)
+  )
+    return false;
+  const numberedList =
+    /^\d{1,2}\s+/.test(title) &&
+    /\b(top|best|tips|tools|software|solutions|ways|strategies|platforms|apps|steps|mejores|consejos|herramientas|soluciones|formas|estrategias)\b/.test(
+      title,
+    );
+  const howTo =
+    /^(how to\b|what (?:is|are)\b|como (?:usar|utilizar|mejorar|aumentar|crear|elegir|optimizar)\b|que (?:es|son)\b)/.test(
+      title,
+    );
+  const marketingLead =
+    /^(discover|learn|explore|unlock|find out|descubre|aprende|explora)\b/.test(
+      excerpt,
+    );
+  const operationalGuide =
+    /\b(software|lead scoring|sales|marketing|seo|crm|conversion|productivity|website|herramientas|ventas|productividad)\b/.test(
+      title,
+    );
+  const explicitNews =
+    /\b(reports?|reported|announces?|announced|discloses?|disclosed|confirms?|confirmed|anuncio|reporto|publico resultados)\b/.test(
+      title,
+    ) ||
+    (/\b(reported|announced|disclosed|confirmed|anuncio|reporto)\b/.test(
+      excerpt,
+    ) &&
+      /\b(quarter|earnings|financial report|court|agreement|trimestre|resultados financieros|acuerdo)\b/.test(
+        excerpt,
+      ));
+  const financialExplainer =
+    /\b(bonds?|etfs?|duration|yields?|expense ratios?|interest rates?|inflation|central bank|federal reserve|dividends?|portfolio|diversification|bonos?|duracion|tasas? de interes|inflacion|dividendos?|portafolio|diversificacion)\b/.test(
+      title,
+    ) &&
+    excerpt.length >= 100 &&
+    /\b(fees?|rates?|yields?|duration|maturity|risk|costs?|tasas?|riesgo|costos?|vencimiento)\b/.test(
+      excerpt,
+    );
+  return !(
+    (numberedList || howTo) &&
+    (marketingLead || operationalGuide) &&
+    !explicitNews &&
+    !financialExplainer
+  );
+}
 function eventKind(title: string, text: string) {
   return (
     kinds.find((k) => k.pattern.test(title)) ??
@@ -341,12 +397,7 @@ export function buildFinanceNewsEvent(
   if (!title) return;
   const titleText = normalize(title),
     text = normalize(`${title} ${excerpt}`);
-  if (
-    /^(?:ask hn|show hn|tell hn):/.test(titleText) ||
-    promotional.test(titleText) ||
-    personalReview.test(titleText)
-  )
-    return;
+  if (!eligibleSourceText({ title, excerpt, sourceId: story.sourceId })) return;
   const companies = companyMentions(`${title} ${excerpt}`),
     kind = eventKind(titleText, text);
   const hardFinance =
@@ -505,10 +556,12 @@ export function selectLatestFinanceEvents(
     )
       latest.set(group, event);
   });
-  return [...latest.values()].sort(
-    (a, b) =>
-      b.publishedAt.localeCompare(a.publishedAt) || b.id.localeCompare(a.id),
-  );
+  return [...latest.values()]
+    .filter(eligibleSourceText)
+    .sort(
+      (a, b) =>
+        b.publishedAt.localeCompare(a.publishedAt) || b.id.localeCompare(a.id),
+    );
 }
 
 function validQuote(quote: Quote, day: string, now: Date) {
