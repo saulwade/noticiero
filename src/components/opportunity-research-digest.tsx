@@ -10,8 +10,18 @@ const countries: Record<string, string> = {
   PE: "Perú",
   BR: "Brasil",
 };
-export function OpportunityResearchDigest({ data }: { data?: EvidenceData }) {
-  const leads = data?.shortlist ?? [];
+export function OpportunityResearchDigest({
+  data,
+  query = "",
+}: {
+  data?: EvidenceData;
+  query?: string;
+}) {
+  const leads = (data?.shortlist ?? []).filter((lead) =>
+    `${lead.label} ${lead.product} ${lead.segment} ${lead.obstacle}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
   const regional = (data?.coverage ?? []).filter((c) => c.country !== "US");
   return (
     <section
@@ -91,9 +101,9 @@ export function OpportunityResearchDigest({ data }: { data?: EvidenceData }) {
         </div>
       ) : (
         <p className="op-lead-empty">
-          Todavía falta evidencia concreta y repetida para seleccionar un
-          problema. El archivo sigue acumulándose automáticamente; no se inventa
-          una oportunidad para llenar este espacio.
+          {query
+            ? "No hay problemas seleccionados que coincidan con esta búsqueda."
+            : "Todavía falta evidencia concreta y repetida para seleccionar un problema. El archivo sigue acumulándose automáticamente; no se inventa una oportunidad para llenar este espacio."}
         </p>
       )}
     </section>

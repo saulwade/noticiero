@@ -114,8 +114,8 @@ export function ResearchWorkspace({
       </div>
       {tab === "ideas" ? (
         <>
-          <OpportunityResearchDigest data={data.evidence} />
-          {children}
+          <OpportunityResearchDigest data={data.evidence} query={query} />
+          {data.opportunities.length ? children : null}
           {!data.opportunities.length ? (
             <button className="notebook-invite" onClick={() => setTab("notes")}>
               Las señales aisladas también cuentan. Abrir el cuaderno

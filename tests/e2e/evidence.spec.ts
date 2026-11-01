@@ -128,6 +128,17 @@ test("CSV explícito y revisión persistente dentro de Oportunidades", async ({
   });
   await expect(priorities).toContainText("México:");
   await expect(priorities).toContainText("Repetición histórica");
+  const globalSearch = page.getByRole("textbox", {
+    name: "Buscar noticias, empresas o ideas",
+  });
+  await globalSearch.fill(provider);
+  await expect(priorities).toContainText(provider);
+  await globalSearch.fill(`no-selected-problem-${marker}`);
+  await expect(priorities).toContainText(
+    "No hay problemas seleccionados que coincidan con esta búsqueda.",
+  );
+  await expect(priorities.locator(".op-lead")).toHaveCount(0);
+  await globalSearch.fill("");
   expect(writes).toHaveLength(1);
   expect(JSON.parse(writes[0]).action).toBe("import");
 
