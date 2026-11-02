@@ -1,6 +1,10 @@
 import { editionFor } from "@/lib/time";
 import type { BackupRun, JobRun } from "@/lib/types";
-export type Finding = { id: string; message: string };
+export type Finding = {
+  id: string;
+  message: string;
+  severity?: "warning" | "critical";
+};
 export function healthFindings(
   jobs: JobRun[],
   backup: BackupRun | undefined,

@@ -104,6 +104,7 @@ export async function getOperationsData(): Promise<OperationsData> {
     if (row.data.status === "error" || row.data.blocked)
       current.push({
         id: `evidence-${row.id}`,
+        severity: row.data.blocked ? "critical" : "warning",
         message: `Radar: ${row.id} — ${row.data.message}`,
       });
   }

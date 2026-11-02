@@ -206,6 +206,7 @@ export type ValidationData = {
 };
 export type OperationAlert = {
   id: string;
+  severity?: "warning" | "critical";
   message: string;
   firstSeen: string;
   lastSeen: string;

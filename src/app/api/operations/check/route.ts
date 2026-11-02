@@ -7,7 +7,11 @@ export async function GET(request: Request) {
   return Response.json(
     {
       ok: data.alerts.length === 0,
-      findings: data.alerts.map(({ id, message }) => ({ id, message })),
+      findings: data.alerts.map(({ id, message, severity }) => ({
+        id,
+        message,
+        severity: severity ?? "critical",
+      })),
     },
     {
       status: data.alerts.length ? 503 : 200,

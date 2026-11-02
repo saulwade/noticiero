@@ -81,6 +81,7 @@ describe("registro operativo", () => {
       schema.jobs,
       schema.backupRuns,
       schema.operationAlerts,
+      schema.evidenceConnectors,
       schema.financeSync,
       schema.financeInstruments,
       schema.financeProfiles,
@@ -185,6 +186,32 @@ describe("registro operativo", () => {
     await expect(
       recordBackup({ status: "completed", runId: "123" }),
     ).rejects.toThrow("Manifiesto");
+  });
+  it("un fallo recuperable de fuente es advertencia y un bloqueo sigue crítico", async () => {
+    const db = await getDb();
+    const source = {
+      id: "sfc-co" as const,
+      status: "error" as const,
+      count: 0,
+      checkedAt: new Date().toISOString(),
+      message: "No responde; se conserva el historial",
+    };
+    await db
+      .insert(schema.evidenceConnectors)
+      .values({ id: source.id, data: source });
+    const warning = (await reconcileOperations()).alerts.find(
+      (a) => a.id === "evidence-sfc-co",
+    );
+    expect(warning?.severity).toBe("warning");
+    await db
+      .update(schema.evidenceConnectors)
+      .set({ data: { ...source, blocked: true } });
+    expect(
+      (await reconcileOperations()).alerts.find(
+        (a) => a.id === "evidence-sfc-co",
+      )?.severity,
+    ).toBe("critical");
+    expect(await db.select().from(schema.evidenceConnectors)).toHaveLength(1);
   });
   it("mide capacidad y avisa del archivo aunque el respaldo haya funcionado", async () => {
     const data = await recordBackup({

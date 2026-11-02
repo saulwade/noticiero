@@ -9,6 +9,16 @@ const messages = {
   "backup-stale": "El respaldo tiene más de treinta y seis horas.",
   "archive-unconfirmed":
     "El archivo histórico duradero no tiene una copia verificada en el último respaldo.",
+  "evidence-sfc-co":
+    "La fuente de estadísticas de Colombia no pudo actualizarse. Se conserva el historial anterior; revisar el detalle en la app.",
+  "evidence-profeco":
+    "La fuente de PROFECO no pudo actualizarse. Se conserva el historial anterior; revisar el detalle en la app.",
+  "evidence-github":
+    "La muestra de problemas de GitHub no pudo actualizarse. Se conserva el historial anterior; revisar el detalle en la app.",
+  "evidence-cfpb":
+    "La muestra de reclamaciones de CFPB no pudo actualizarse. Se conserva el historial anterior; revisar el detalle en la app.",
+  "evidence-hn":
+    "La muestra de Hacker News no pudo actualizarse. Se conserva el historial anterior; revisar el detalle en la app.",
   "storage-check-failed":
     "No se pudo comprobar el espacio disponible de la base.",
   "storage-database":

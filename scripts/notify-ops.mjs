@@ -1,4 +1,5 @@
 import { operationMessage } from "./lib/ops-messages.mjs";
+import { monitorFailed } from "./lib/monitor-result.mjs";
 const origin = "https://noticiero-self.vercel.app";
 const repository = process.env.GITHUB_REPOSITORY;
 if (!repository || !/^saulwade\/noticiero-ops$/.test(repository))
@@ -24,6 +25,8 @@ async function github(path, method = "GET", body) {
 }
 
 let findings = [];
+let reportedFindings = [];
+let transportFailed = false;
 try {
   const response = await fetch(`${origin}/api/operations/check`, {
     headers: { Authorization: `Bearer ${process.env.OPS_MONITOR_SECRET}` },
@@ -34,8 +37,20 @@ try {
   const data = await response.json();
   if (!Array.isArray(data.findings) || typeof data.ok !== "boolean")
     throw new Error();
+  if (
+    data.findings.some(
+      (item) =>
+        !item ||
+        typeof item.id !== "string" ||
+        typeof item.message !== "string",
+    ) ||
+    data.ok !== (data.findings.length === 0)
+  )
+    throw new Error();
+  reportedFindings = data.findings;
   findings = data.findings.map(operationMessage);
 } catch {
+  transportFailed = true;
   findings = [
     "Noticiero no responde al monitor o rechazó la comprobación. Revisa su disponibilidad y configuración.",
   ];
@@ -67,8 +82,22 @@ try {
         await github(`/issues/${existing.number}`, "PATCH", { body });
     } else
       await github("/issues", "POST", { title, body, assignees: ["saulwade"] });
-    console.error("Se registró un aviso privado de operaciones.");
-    process.exitCode = 1;
+    if (
+      monitorFailed(reportedFindings, {
+        transportFailed,
+        backupFailed: process.env.BACKUP_STATUS === "failed",
+        testAlert: process.env.OPS_TEST_ALERT === "true",
+      })
+    ) {
+      console.error(
+        "Se registró un aviso privado que requiere atención crítica.",
+      );
+      process.exitCode = 1;
+    } else {
+      console.warn(
+        "::warning::Hay una fuente con actualización pendiente. La incidencia privada sigue abierta; el monitor completó la comprobación.",
+      );
+    }
   } else {
     if (existing)
       await github(`/issues/${existing.number}`, "PATCH", {
