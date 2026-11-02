@@ -2,7 +2,11 @@ import { withAlphaRequest } from "@/features/market/request-budget";
 import { hash } from "@/features/news/normalize";
 import { alphaVantageKey, fetchDailyPrice } from "./daily-providers";
 import { decimal, formatted } from "./decimal";
-import { expectedUsClose, isUsTradingDay, validDay } from "./market-calendar";
+import {
+  latestClosedUsSession,
+  isUsTradingDay,
+  validDay,
+} from "./market-calendar";
 import type {
   AutomationAsset,
   AutomationHistory,
@@ -36,6 +40,7 @@ export const AUTOMATION_ASSETS: AutomationAsset[] = [
   },
 ];
 export const AUTOMATION_MAX_PROVIDER_BYTES = 8_000_000;
+export const WEEKLY_HISTORY_VERSION = "closed-session-v2";
 const DAY = 86_400_000;
 type Options = {
   fetcher?: typeof fetch;
@@ -107,7 +112,7 @@ export function parseWeeklyAdjusted(
     metadata = obj(root["Meta Data"]);
   if (metadata["2. Symbol"] !== symbol)
     throw new Error("Símbolo histórico no confirmado.");
-  const end = expectedUsClose(now),
+  const end = latestClosedUsSession(now),
     cutoff = new Date(Date.parse(`${end}T12:00:00Z`) - 5 * 366 * DAY)
       .toISOString()
       .slice(0, 10);

@@ -84,6 +84,16 @@ function fail(
   error: unknown,
 ): ConnectorBatch {
   const batch = failure(id, previous, now, error);
+  if (id === "sfc-co" && batch.state.blocked) {
+    try {
+      batch.state.cursor = JSON.stringify({
+        ...JSON.parse(previous?.cursor ?? "{}"),
+        ...JSON.parse(batch.state.cursor ?? "{}"),
+      });
+    } catch {
+      /* Retain the valid provider cooldown on a malformed legacy cursor. */
+    }
+  }
   if (id === "profeco" && batch.state.blocked) {
     try {
       batch.state.cursor = JSON.stringify({
@@ -200,16 +210,64 @@ export async function collectColombia(
     const today = editionFor(now).date,
       [year, month] = today.split("-").map(Number);
     const url = new URL("https://www.datos.gov.co/resource/xyy7-rn7p.json");
+    // LIMIT is applied after GROUP BY by Socrata: discover one recent period
+    // first instead of aggregating two full years before limiting the result.
+    url.search = new URLSearchParams({
+      $select: "a_o_creacion,mes_creacion",
+      $where: `a_o_creacion >= ${year - 1} AND (a_o_creacion < ${year} OR mes_creacion <= ${month})`,
+      $order: "a_o_creacion DESC,mes_creacion DESC",
+      $limit: "1",
+    }).toString();
+    const periodRows = z
+      .array(z.object({ a_o_creacion: value, mes_creacion: value }))
+      .max(1)
+      .parse(await publicJson(url, now, fetcher, 30_000));
+    const latest = periodRows[0];
+    if (!latest) throw new Error("No hay un periodo publicado verificable.");
+    const latestYear = Number(latest.a_o_creacion),
+      latestMonth = Number(latest.mes_creacion);
+    if (
+      !Number.isInteger(latestYear) ||
+      latestYear < year - 1 ||
+      latestYear > year ||
+      !Number.isInteger(latestMonth) ||
+      latestMonth < 1 ||
+      latestMonth > 12 ||
+      !calendar(`${latestYear}-${String(latestMonth).padStart(2, "0")}-01`, now)
+    )
+      throw new Error("Periodo publicado inválido.");
+    const periodKey = `${latestYear}-${String(latestMonth).padStart(2, "0")}`;
+    let scanOffset = 0,
+      head = true;
+    try {
+      const cursor = JSON.parse(previous?.cursor ?? "{}");
+      if (
+        cursor.period === periodKey &&
+        Number.isSafeInteger(cursor.offset) &&
+        cursor.offset >= 0 &&
+        cursor.offset <= 10000 &&
+        typeof cursor.headNext === "boolean"
+      ) {
+        scanOffset = cursor.offset;
+        head = cursor.headNext;
+      }
+    } catch {
+      /* A legacy cursor starts at the head; stored evidence is unchanged. */
+    }
+    const offset = head ? 0 : scanOffset;
     url.search = new URLSearchParams({
       $select:
         "a_o_creacion,mes_creacion,motivo,producto,sum(cantidad_quejas_recibidas) as total",
       $group: "a_o_creacion,mes_creacion,motivo,producto",
-      $where: `a_o_creacion >= ${year - 1} AND (a_o_creacion < ${year} OR mes_creacion <= ${month})`,
+      $where: `a_o_creacion = ${latestYear} AND mes_creacion = ${latestMonth}`,
       $order:
         "a_o_creacion DESC,mes_creacion DESC,total DESC,motivo ASC,producto ASC",
       $limit: String(CAP),
+      $offset: String(offset),
     }).toString();
-    const data = colombiaSchema.parse(await publicJson(url, now, fetcher));
+    const data = colombiaSchema.parse(
+      await publicJson(url, now, fetcher, 30_000),
+    );
     const records: EvidenceRecord[] = [];
     for (const row of data) {
       const y = Number(row.a_o_creacion),
@@ -217,6 +275,8 @@ export async function collectColombia(
         total = Number(row.total);
       if (
         !Number.isInteger(y) ||
+        y !== latestYear ||
+        m !== latestMonth ||
         !Number.isInteger(m) ||
         m < 1 ||
         m > 12 ||
@@ -260,7 +320,16 @@ export async function collectColombia(
         status: "limited",
         checkedAt: now.toISOString(),
         count: records.length,
-        message: `Hasta ${CAP} grupos mensuales por producto/motivo del conjunto oficial xyy7-rn7p. Estadísticas agregadas, no testimonios ni autores. La fecha representa el inicio del periodo indicado; no crecimiento diario ni censo completo.`,
+        cursor: JSON.stringify({
+          period: periodKey,
+          offset: head
+            ? Math.max(scanOffset, CAP)
+            : data.length < CAP || offset + CAP >= 10000
+              ? 0
+              : offset + CAP,
+          headNext: !head || data.length < CAP,
+        }),
+        message: `Hasta ${CAP} grupos por consulta del último periodo publicado ${periodKey}, alternando cabecera y páginas por producto/motivo del conjunto oficial xyy7-rn7p. Estadísticas agregadas, no testimonios ni autores. La fecha representa el inicio del periodo indicado; no crecimiento diario ni censo completo.`,
       },
     };
   } catch (error) {

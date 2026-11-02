@@ -3,6 +3,7 @@ import {
   expectedUsClose,
   isUsTradingDay,
   usSessionCloseHour,
+  latestClosedUsSession,
 } from "@/features/finance/market-calendar";
 import {
   fetchDailyFx,
@@ -35,6 +36,27 @@ const answer = (data: unknown, status = 200) =>
 afterEach(() => vi.unstubAllEnvs());
 
 describe("calendario de cierres estadounidenses", () => {
+  it("separa cierre confirmado y margen de publicación, incluidos DST y cierre temprano", () => {
+    expect(latestClosedUsSession(new Date("2026-11-02T20:59:59Z"))).toBe(
+      "2026-10-30",
+    );
+    expect(latestClosedUsSession(new Date("2026-11-02T21:00:00Z"))).toBe(
+      "2026-11-02",
+    );
+    expect(expectedUsClose(new Date("2026-11-02T23:00:00Z"))).toBe(
+      "2026-10-30",
+    );
+    expect(latestClosedUsSession(new Date("2026-10-30T20:00:00Z"))).toBe(
+      "2026-10-30",
+    );
+    expect(latestClosedUsSession(new Date("2026-11-27T17:59:59Z"))).toBe(
+      "2026-11-25",
+    );
+    expect(latestClosedUsSession(new Date("2026-11-27T18:00:00Z"))).toBe(
+      "2026-11-27",
+    );
+    expect(() => latestClosedUsSession(new Date("invalid"))).toThrow();
+  });
   it("espera las20h Nueva York, incluidos cambio de DST y fines de semana", () => {
     expect(expectedUsClose(new Date("2026-10-31T00:00:00Z"))).toBe(
       "2026-10-30",
@@ -94,6 +116,16 @@ describe("calendario de cierres estadounidenses", () => {
 });
 
 describe("referencias diarias de fuentes acotadas", () => {
+  it("acepta el cierre nuevo antes del margen de publicación sin aceptar una sesión abierta", async () => {
+    vi.stubEnv("ALPHA_VANTAGE_API_KEY", "fixture");
+    const day = answer(quote({ "07. latest trading day": "2026-11-02" }));
+    await expect(
+      fetchDailyPrice(fund, new Date("2026-11-02T23:00:00Z"), day),
+    ).resolves.toMatchObject({ asOf: "2026-11-02" });
+    await expect(
+      fetchDailyPrice(fund, new Date("2026-11-02T20:59:00Z"), day),
+    ).rejects.toThrow();
+  });
   it("solo admite USD stock/ETF de mercados explícitos", () => {
     expect(supportsAutomaticPrice(fund)).toBe(true);
     for (const i of [

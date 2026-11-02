@@ -26,6 +26,19 @@ const grant: typeof withAlphaRequest = async (request) => ({
 afterEach(() => vi.unstubAllEnvs());
 
 describe("históricos automáticos con FX fechado", () => {
+  it("no rechaza una serie válida por incluir el cierre recién publicado del lunes", () => {
+    const raw = weekly({
+      "2026-11-02": { "4. close": "105", "5. adjusted close": "104" },
+    });
+    expect(
+      parseWeeklyAdjusted(raw, "VT", new Date("2026-11-02T23:00:00Z")).at(-1)
+        ?.date,
+    ).toBe("2026-11-02");
+    expect(() =>
+      parseWeeklyAdjusted(raw, "VT", new Date("2026-11-02T20:59:00Z")),
+    ).toThrow();
+    expect(() => parseWeeklyAdjusted(raw, "VT", now)).toThrow();
+  });
   it("conserva cierre y cierre ajustado separados, nunca precios futuros", () => {
     expect(parseWeeklyAdjusted(weekly(), "VT", now)).toEqual([
       { date: "2026-10-23", close: "100", adjustedClose: "98" },

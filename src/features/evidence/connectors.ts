@@ -156,6 +156,7 @@ export async function publicJson(
   url: URL,
   now: Date,
   fetcher: Fetcher,
+  timeoutMs = 12_000,
 ): Promise<unknown> {
   const response = await fetcher(url.toString(), {
     headers: {
@@ -165,7 +166,7 @@ export async function publicJson(
     credentials: "omit",
     redirect: "error",
     cache: "no-store",
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(Math.min(30_000, timeoutMs)),
   });
   if (
     response.status === 429 ||

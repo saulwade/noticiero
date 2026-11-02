@@ -68,6 +68,33 @@ beforeEach(async () => {
   vi.mocked(assertFinanceCapacity).mockReset().mockResolvedValue(undefined);
 });
 describe("preparación automática acotada de acciones", () => {
+  it("reintenta un error del parser anterior una vez y conserva el enfriamiento en el nuevo", async () => {
+    const db = await getDb(),
+      source = providers();
+    await db
+      .insert(t.financeSync)
+      .values({
+        id: "stock-history:ETN",
+        data: {
+          id: "stock-history:ETN",
+          label: "Historia",
+          provider: "Fixture",
+          status: "error",
+          message: "Error previo",
+          lastAttempt: now.toISOString(),
+        },
+      });
+    vi.mocked(source.history).mockRejectedValue(new Error("still unavailable"));
+    const events = [event("Eaton expands data center power infrastructure")];
+    await prepareStockContext(events, now, source);
+    await prepareStockContext(events, new Date(now.getTime() + 60000), source);
+    expect(source.history).toHaveBeenCalledTimes(1);
+    const state = (await db.select().from(t.financeSync)).find(
+      (r) => r.id === "stock-history:ETN",
+    )?.data;
+    expect(state?.sourceVersion).toBe("closed-session-v2");
+    expect(state?.status).toBe("error");
+  });
   it("cuota agotada deja datos pendientes hasta el siguiente día UTC sin falsa avería", async () => {
     const db = await getDb(),
       source = providers();

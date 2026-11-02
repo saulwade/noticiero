@@ -63,6 +63,7 @@ export type FinanceSyncState = {
   scanCursor?: string;
   scanComplete?: boolean;
   inputHash?: string;
+  sourceVersion?: string;
 };
 export type FinanceMarketStatus = {
   alphaVantageConfigured: boolean;

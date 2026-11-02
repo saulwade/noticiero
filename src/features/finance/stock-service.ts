@@ -8,7 +8,10 @@ import {
 } from "@/db/schema";
 import { assertFinanceCapacity } from "./capacity";
 import { discoverStockCandidates } from "./stock-discovery";
-import { fetchWeeklyHistory } from "./automatic-providers";
+import {
+  fetchWeeklyHistory,
+  WEEKLY_HISTORY_VERSION,
+} from "./automatic-providers";
 import { collectCompanyFacts } from "./sec";
 import { collectStockFacts } from "./stock-fundamentals";
 import type { FinanceNewsEvent } from "./research-types";
@@ -30,9 +33,12 @@ export async function prepareStockContext(
   events: FinanceNewsEvent[],
   now = new Date(),
   providers: StockProviders = defaults,
+  onlySymbols?: readonly string[],
 ): Promise<StockContext> {
   const db = await getDb(),
-    candidates = discoverStockCandidates(events, now);
+    candidates = discoverStockCandidates(events, now).filter(
+      (candidate) => !onlySymbols || onlySymbols.includes(candidate.symbol),
+    );
   const [storedFacts, storedHistory] = await Promise.all([
     db.select().from(financeResearch),
     db.select().from(financeHistories),
@@ -60,6 +66,8 @@ export async function prepareStockContext(
       .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))[0];
     for (const kind of ["facts", "history"] as const) {
       const id = `stock-${kind}:${candidate.symbol}`;
+      const sourceVersion =
+        kind === "history" ? WEEKLY_HISTORY_VERSION : undefined;
       const budget = kind === "facts" ? factsCalls < 3 : historyCalls < 1;
       const cached = kind === "facts" ? candidate.facts : candidate.history;
       const token = `${now.toISOString()}:${candidate.symbol}:${kind}`;
@@ -74,6 +82,7 @@ export async function prepareStockContext(
             (previous?.status === "running" &&
               Date.parse(previous.leaseUntil ?? "") > now.getTime()) ||
             (previous?.status === "error" &&
+              previous.sourceVersion === sourceVersion &&
               now.getTime() - Date.parse(previous.lastAttempt ?? "") < DAY) ||
             (previous?.status === "configuration" &&
               previous.session === now.toISOString().slice(0, 10)) ||
@@ -92,6 +101,7 @@ export async function prepareStockContext(
                 ? "SEC EDGAR / Alpha Vantage"
                 : "Alpha Vantage + Frankfurter",
             status: "running",
+            sourceVersion,
             message: "Preparando evidencia financiera pública.",
             lastAttempt: now.toISOString(),
             leaseToken: token,

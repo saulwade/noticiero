@@ -99,7 +99,7 @@ export function usSessionCloseHour(day: string): 13 | 16 | undefined {
     ? 13
     : 16;
 }
-export function expectedUsClose(now: Date): string {
+function newYorkClock(now: Date) {
   if (!Number.isFinite(now.getTime()))
     throw new Error("Fecha de consulta inválida.");
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -111,8 +111,26 @@ export function expectedUsClose(now: Date): string {
     hourCycle: "h23",
   }).formatToParts(now);
   const part = (type: string) => parts.find((p) => p.type === type)!.value;
-  let day = `${part("year")}-${part("month")}-${part("day")}`;
-  if (Number(part("hour")) < 20) day = shift(day, -1);
+  return {
+    day: `${part("year")}-${part("month")}-${part("day")}`,
+    hour: Number(part("hour")),
+  };
+}
+/** Maximum permissible completed regular session, independent of publication lag. */
+export function latestClosedUsSession(now: Date): string {
+  const { hour } = newYorkClock(now);
+  let { day } = newYorkClock(now);
+  const close = usSessionCloseHour(day);
+  if (close === undefined || hour < close) day = shift(day, -1);
+  for (let n = 0; n < 20; n++, day = shift(day, -1))
+    if (isUsTradingDay(day)) return day;
+  throw new Error("No se pudo confirmar una sesión cerrada.");
+}
+/** Minimum session required once providers have had their publication grace. */
+export function expectedUsClose(now: Date): string {
+  const { hour } = newYorkClock(now);
+  let { day } = newYorkClock(now);
+  if (hour < 20) day = shift(day, -1);
   for (let n = 0; n < 20; n++, day = shift(day, -1))
     if (isUsTradingDay(day)) return day;
   throw new Error("No se pudo determinar una sesión reciente.");

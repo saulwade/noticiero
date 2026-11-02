@@ -104,16 +104,14 @@ describe("fuentes oficiales regionales acotadas", () => {
     );
   });
   it("alterna la cabecera con antecedentes y no queda atascado en el límite", async () => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockImplementation(async () =>
-        profeco(
-          Array.from({ length: 20 }, (_, i) => ({
-            ...row,
-            id_expediente: String(i),
-          })),
-        ),
-      );
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () =>
+      profeco(
+        Array.from({ length: 20 }, (_, i) => ({
+          ...row,
+          id_expediente: String(i),
+        })),
+      ),
+    );
     const first = await collectProfeco(undefined, now, fetcher);
     const second = await collectProfeco(first.state, now, fetcher);
     await collectProfeco(second.state, now, fetcher);
@@ -192,11 +190,19 @@ describe("fuentes oficiales regionales acotadas", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it("Colombia conserva cantidades mensuales como estadísticas, nunca personas", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json([total]));
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([total]));
     const batch = await collectColombia(undefined, now, fetcher);
-    const url = new URL(String(fetcher.mock.calls[0][0]));
+    const discovery = new URL(String(fetcher.mock.calls[0][0]));
+    expect(discovery.searchParams.get("$limit")).toBe("1");
+    expect(discovery.searchParams.has("$group")).toBe(false);
+    const url = new URL(String(fetcher.mock.calls[1][0]));
     expect(url.origin).toBe("https://www.datos.gov.co");
     expect(url.searchParams.get("$limit")).toBe("20");
+    expect(url.searchParams.get("$where")).toBe(
+      "a_o_creacion = 2026 AND mes_creacion = 9",
+    );
     expect(batch.records[0]).toMatchObject({
       kind: "statistic",
       country: "CO",
@@ -222,6 +228,69 @@ describe("fuentes oficiales regionales acotadas", () => {
       ),
     );
     expect(batch.records).toEqual([]);
+  });
+  it("descubre el año anterior cuando el nuevo aún no tiene publicación y respeta 429", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        json([{ a_o_creacion: "2026", mes_creacion: "12" }]),
+      )
+      .mockResolvedValueOnce(json([{ ...total, mes_creacion: "12" }]));
+    const batch = await collectColombia(
+      undefined,
+      new Date("2027-01-10T15:00:00Z"),
+      fetcher,
+    );
+    expect(batch.records[0]?.period).toBe("2026-12");
+    expect(
+      new URL(String(fetcher.mock.calls[1][0])).searchParams.get("$where"),
+    ).toBe("a_o_creacion = 2026 AND mes_creacion = 12");
+    const limited = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response("", { status: 429, headers: { "retry-after": "3600" } }),
+      );
+    const paused = await collectColombia(undefined, now, limited);
+    await collectColombia(paused.state, now, limited);
+    expect(limited).toHaveBeenCalledTimes(1);
+    expect(paused.records).toEqual([]);
+    expect(paused.state.blocked).toBe(true);
+  });
+  it("alterna cabecera y páginas, reinicia al cambiar el periodo y conserva cursor en pausa", async () => {
+    let month = "9";
+    const offsets: string[] = [];
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const u = new URL(String(input));
+      if (!u.searchParams.has("$group"))
+        return json([{ a_o_creacion: "2026", mes_creacion: month }]);
+      offsets.push(u.searchParams.get("$offset")!);
+      return json(
+        Array.from({ length: 20 }, (_, i) => ({
+          ...total,
+          mes_creacion: month,
+          motivo: `Motivo ${Number(u.searchParams.get("$offset")) + i}`,
+        })),
+      );
+    });
+    let state;
+    for (let i = 0; i < 4; i++)
+      state = (await collectColombia(state, now, fetcher)).state;
+    expect(offsets).toEqual(["0", "20", "0", "40"]);
+    month = "10";
+    state = (await collectColombia(state, now, fetcher)).state;
+    expect(offsets.at(-1)).toBe("0");
+    const limited = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response("", { status: 429, headers: { "retry-after": "3600" } }),
+      );
+    const paused = await collectColombia(state, now, limited);
+    expect(JSON.parse(paused.state.cursor!)).toMatchObject({
+      period: "2026-10",
+      offset: 20,
+      retryAt: expect.any(String),
+    });
+    expect(paused.records).toEqual([]);
   });
   it("acota respuestas grandes y conserva el archivo ante fallos de red", async () => {
     const fetcher = vi

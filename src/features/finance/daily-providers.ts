@@ -1,6 +1,11 @@
 import { decimal, formatted } from "./decimal";
 import { financeDay } from "./engine";
-import { expectedUsClose, isUsTradingDay, validDay } from "./market-calendar";
+import {
+  expectedUsClose,
+  latestClosedUsSession,
+  isUsTradingDay,
+  validDay,
+} from "./market-calendar";
 import type { Instrument } from "./types";
 import type { Quote } from "@/lib/types";
 
@@ -104,6 +109,7 @@ export async function fetchDailyPrice(
       "Falta configurar una clave propia gratuita de Alpha Vantage.",
     );
   const session = expectedUsClose(now);
+  const closed = latestClosedUsSession(now);
   const url = new URL("https://www.alphavantage.co/query");
   url.search = new URLSearchParams({
     function: "GLOBAL_QUOTE",
@@ -119,7 +125,8 @@ export async function fetchDailyPrice(
       body["01. symbol"] !== instrument.symbol ||
       typeof asOf !== "string" ||
       !isUsTradingDay(asOf) ||
-      asOf !== session
+      asOf < session ||
+      asOf > closed
     )
       throw new Error("Sesión no confirmada.");
     const value = priceString(body["05. price"]);
