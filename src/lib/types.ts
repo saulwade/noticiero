@@ -219,12 +219,19 @@ export type BackupRun = {
   counts?: Record<string, number>;
   sha256?: string;
   runId?: string;
+  archive?: {
+    status: "completed" | "failed";
+    url?: string;
+    sha256?: string;
+    bytes?: number;
+  };
 };
 export type OperationsData = {
   alerts: OperationAlert[];
   backup?: BackupRun;
   lastSuccessfulUpdate?: string;
   repository?: string;
+  capacity?: import("@/features/storage/capacity").StorageCapacity;
 };
 export type SourceState = {
   id: string;

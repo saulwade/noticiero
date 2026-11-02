@@ -104,7 +104,7 @@ Las evaluaciones **Útil / Mal clasificado / Duplicado / Segmento incorrecto** y
 
 El balance semanal se actualiza con las ediciones y permanece provisional hasta el cierre del domingo desde las 20:00 CDMX. Los cierres son inmutables y se recupera el cierre del periodo anterior si se cambia de semana. Compara publicaciones por su fecha original y distingue capturas históricas. La descarga del Radar contiene el archivo completo y los reportes; la vista usa una muestra acotada y un presupuesto de 1.5 MB para no superar los límites de respuestas de Vercel.
 
-El Radar tiene un límite conservador de 10,000 versiones / 16 MB de evidencia. Al alcanzarlo detiene la ampliación y genera un aviso, sin borrar datos ni subir de plan. Los cuatro nuevos grupos de datos (evidencia, evaluaciones, cursores y reportes) entran en el respaldo cifrado; la restauración también acepta respaldos anteriores de 22 tablas. No se instalaron embeddings ni se contrató una API de IA. Las correcciones manuales sirven para evaluar el motor, no lo reentrenan automáticamente. La meta de precisión en 100 ejemplos revisados requiere una evaluación posterior; no se presenta como resultado conseguido.
+El Radar tiene un límite conservador de 50,000 versiones / 64 MB de evidencia. Al alcanzarlo detiene la ampliación y genera un aviso, sin borrar datos ni subir de plan. Los cuatro nuevos grupos de datos (evidencia, evaluaciones, cursores y reportes) entran en el respaldo cifrado; la restauración también acepta respaldos anteriores de 22 tablas. No se instalaron embeddings ni se contrató una API de IA. Las correcciones manuales sirven para evaluar el motor, no lo reentrenan automáticamente. La meta de precisión en 100 ejemplos revisados requiere una evaluación posterior; no se presenta como resultado conseguido.
 
 ## Operación de respaldos
 
@@ -211,3 +211,14 @@ Las pruebas E2E usan Google Chrome local, el build de producción y un servidor 
 - `scripts`: actualización manual y generación del horario local.
 
 Product Hunt, X, Reddit, NYT y WSJ están identificados como integraciones planeadas; no se presentan como conectados. Su acceso requiere la API, credencial o licencia correspondiente. El [plan aprobado](docs/superpowers/plans/2026-10-28-noticiero.md) contiene el alcance original.
+
+
+### Capacidad y archivo histórico
+
+Estado y respaldos mide la base principal y el volumen de evidencia. Avisa al 70% y al 85% del margen: 1 GB de referencia para la base y 50,000 versiones / 64 MB para evidencia. La referencia no representa el uso facturado de todas las ramas ni las cuotas de compute/red. Si falla la medición también avisa. No se eliminan registros, cambian planes ni se activan cobros.
+
+El workflow privado diario mantiene el respaldo de Actions (7 días) y añade una copia del mismo snapshot gzip + AES-256-GCM a Releases de `saulwade/noticiero-ops`, agrupadas por mes (`history-YYYY-MM`). Cada asset lleva fecha editorial y SHA-256. Solo añade y consulta: no usa DELETE, reemplazos ni expiración programada. Comprueba el repositorio privado y descarga cada asset para verificar sus bytes antes de registrar éxito. El archivo histórico tiene un aviso independiente si falla; no se presenta como correcto por el solo hecho de tener un respaldo diario.
+
+Recuperación privada: localizar la release mensual y descargar el `.enc`; verificar SHA-256 del nombre/manifiesto y ejecutar `scripts/restore-backup.ts` con la clave de recuperación en el entorno y **una carpeta temporal nueva**. La herramienta rechaza bases no vacías. Cada copia es un snapshot completo, incluidas noticias, observaciones, palabras clave, señales, cuadernos, reportes y guardados. Se puede consultar el JSON descifrado o la base aislada para análisis históricos. Nunca restaurar sobre producción para consultar un archivo.
+
+El archivo es una copia adicional y no libera espacio en Neon: el historial sigue también en la base. GitHub/Neon conservan sus propios límites y condiciones; no se promete capacidad infinita. No se contrató ningún servicio, cambió el plan ni se modificó el portafolio.

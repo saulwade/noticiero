@@ -203,6 +203,12 @@ test("estado discreto y categorías conservadas", async ({ page, isMobile }) => 
     .getByRole("button", { name: "Estado y respaldos", exact: true })
     .click();
   await expect(page.locator(".operations-view")).toContainText("siete días");
+  await expect(page.getByLabel("Capacidad de almacenamiento")).toContainText(
+    "70% y 85%",
+  );
+  await expect(page.getByLabel("Estado del archivo histórico")).toContainText(
+    "sin expiración programada",
+  );
   await expect(
     page.getByLabel("Estado de la investigación automática"),
   ).toContainText("último análisis guardado");

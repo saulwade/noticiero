@@ -2,10 +2,18 @@ import fs from "node:fs/promises";
 const status =
   process.env.BACKUP_STATUS === "completed" ? "completed" : "failed";
 let manifest = {};
+let archive = { status: "failed" };
 if (status === "completed")
   manifest = JSON.parse(
     await fs.readFile(".data/backups/cloud-latest.enc.manifest.json", "utf8"),
   );
+try {
+  archive = JSON.parse(
+    await fs.readFile(".data/backups/cloud-latest.enc.archive.json", "utf8"),
+  );
+} catch {
+  /* A missing archive must not be reported as successful. */
+}
 try {
   const response = await fetch(
     "https://noticiero-self.vercel.app/api/operations/backup",
@@ -19,6 +27,7 @@ try {
         status,
         runId: process.env.GITHUB_RUN_ID,
         ...manifest,
+        archive,
       }),
       signal: AbortSignal.timeout(30000),
       redirect: "error",

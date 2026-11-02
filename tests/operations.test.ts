@@ -114,40 +114,36 @@ describe("registro operativo", () => {
   it("avisa si falta el análisis automático de un perfil configurado y se resuelve al recuperarlo", async () => {
     const db = await getDb();
     const at = new Date().toISOString();
-    await db
-      .insert(schema.financeProfiles)
-      .values({
+    await db.insert(schema.financeProfiles).values({
+      id: "health-profile",
+      data: {
         id: "health-profile",
-        data: {
-          id: "health-profile",
-          version: 1,
-          initialCapitalMxn: "12000",
-          monthlyContributionMxn: "300",
-          horizonYears: 12,
-          riskPreference: "unconfirmed",
-          reserveExcluded: true,
-          broker: { name: "Ejemplo", verified: false },
-          updatedAt: at,
-        },
-      });
+        version: 1,
+        initialCapitalMxn: "12000",
+        monthlyContributionMxn: "300",
+        horizonYears: 12,
+        riskPreference: "unconfirmed",
+        reserveExcluded: true,
+        broker: { name: "Ejemplo", verified: false },
+        updatedAt: at,
+      },
+    });
     expect(
       (await reconcileOperations()).alerts.some(
         (a) => a.id === "finance-automatic-analysis",
       ),
     ).toBe(true);
-    await db
-      .insert(schema.financeSync)
-      .values({
+    await db.insert(schema.financeSync).values({
+      id: "automatic-analysis",
+      data: {
         id: "automatic-analysis",
-        data: {
-          id: "automatic-analysis",
-          label: "Análisis",
-          provider: "Python",
-          status: "ok",
-          message: "Fixture",
-          lastSuccess: at,
-        },
-      });
+        label: "Análisis",
+        provider: "Python",
+        status: "ok",
+        message: "Fixture",
+        lastSuccess: at,
+      },
+    });
     expect(
       (await reconcileOperations()).alerts.some(
         (a) => a.id === "finance-automatic-analysis",
@@ -171,6 +167,12 @@ describe("registro operativo", () => {
       bytes: 20,
       sha256: "a".repeat(64),
       counts: { stories: 1 },
+      archive: {
+        status: "completed",
+        url: "https://github.com/saulwade/noticiero-ops/releases/tag/history-2026-10",
+        bytes: 20,
+        sha256: "a".repeat(64),
+      },
     });
     expect(recovered.alerts).toEqual([]);
     expect(
@@ -183,5 +185,27 @@ describe("registro operativo", () => {
     await expect(
       recordBackup({ status: "completed", runId: "123" }),
     ).rejects.toThrow("Manifiesto");
+  });
+  it("mide capacidad y avisa del archivo aunque el respaldo haya funcionado", async () => {
+    const data = await recordBackup({
+      status: "completed",
+      runId: "124",
+      bytes: 20,
+      sha256: "a".repeat(64),
+      counts: { stories: 1 },
+      archive: { status: "failed" },
+    });
+    expect(data.capacity?.databaseBytes).toBeGreaterThan(0);
+    expect(data.alerts.some((a) => a.id === "archive-unconfirmed")).toBe(true);
+    await expect(
+      recordBackup({
+        status: "completed",
+        runId: "125",
+        bytes: 20,
+        sha256: "a".repeat(64),
+        counts: { stories: 1 },
+        archive: { status: "completed", url: "https://example.com" },
+      }),
+    ).rejects.toThrow();
   });
 });

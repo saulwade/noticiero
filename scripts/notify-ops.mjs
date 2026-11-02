@@ -1,3 +1,4 @@
+import { operationMessage } from "./lib/ops-messages.mjs";
 const origin = "https://noticiero-self.vercel.app";
 const repository = process.env.GITHUB_REPOSITORY;
 if (!repository || !/^saulwade\/noticiero-ops$/.test(repository))
@@ -21,16 +22,7 @@ async function github(path, method = "GET", body) {
   if (!response.ok) throw new Error("No se pudo registrar el aviso en GitHub.");
   return response.status === 204 ? null : response.json();
 }
-const messages = {
-  "update-missing": "Falta la edición de la última ventana programada.",
-  "update-failed": "La última actualización falló.",
-  "update-partial": "La última edición quedó incompleta; hay datos pendientes.",
-  "update-stuck":
-    "Una actualización no ha terminado dentro del plazo esperado.",
-  "backup-missing": "No hay un respaldo automático confirmado.",
-  "backup-failed": "El último respaldo falló.",
-  "backup-stale": "El respaldo tiene más de treinta y seis horas.",
-};
+
 let findings = [];
 try {
   const response = await fetch(`${origin}/api/operations/check`, {
@@ -42,13 +34,7 @@ try {
   const data = await response.json();
   if (!Array.isArray(data.findings) || typeof data.ok !== "boolean")
     throw new Error();
-  findings = data.findings.map(
-    (item) =>
-      messages[item.id] ??
-      (String(item.id).startsWith("source-")
-        ? "Una fuente activa no pudo consultarse."
-        : "Se detectó un problema operativo."),
-  );
+  findings = data.findings.map(operationMessage);
 } catch {
   findings = [
     "Noticiero no responde al monitor o rechazó la comprobación. Revisa su disponibilidad y configuración.",

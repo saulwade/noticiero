@@ -23,8 +23,11 @@ import type {
   EvidenceReview,
 } from "./types";
 
-export const MAX_EVIDENCE_RECORDS = 10000;
-const MAX_EVIDENCE_BYTES = 16_000_000;
+import {
+  MAX_EVIDENCE_RECORDS,
+  MAX_EVIDENCE_BYTES,
+} from "@/features/storage/capacity";
+export { MAX_EVIDENCE_RECORDS } from "@/features/storage/capacity";
 const defaults: ConnectorState[] = [
   "hn",
   "github",

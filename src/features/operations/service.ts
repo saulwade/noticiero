@@ -1,4 +1,9 @@
-import { getDb } from "@/db/client";
+import { getDb, resultRows } from "@/db/client";
+import { sql } from "drizzle-orm";
+import {
+  capacityFindings,
+  type StorageCapacity,
+} from "@/features/storage/capacity";
 import {
   jobs,
   backupRuns,
@@ -14,6 +19,30 @@ import type { BackupRun, OperationAlert, OperationsData } from "@/lib/types";
 import { z } from "zod";
 export async function getOperationsData(): Promise<OperationsData> {
   const db = await getDb();
+  let capacity: StorageCapacity | undefined;
+  try {
+    const row = resultRows(
+      await db.execute(sql`SELECT
+      pg_database_size(current_database())::bigint AS database_bytes,
+      (SELECT count(*) FROM evidence_records)::bigint AS evidence_records,
+      (SELECT coalesce(sum(octet_length(data::text)),0) FROM evidence_records)::bigint AS evidence_bytes`),
+    )[0] as Record<string, unknown>;
+    const values = [
+      row.database_bytes,
+      row.evidence_records,
+      row.evidence_bytes,
+    ].map(Number);
+    if (!values.every((v) => Number.isSafeInteger(v) && v >= 0))
+      throw new Error("Medición inválida");
+    capacity = {
+      databaseBytes: values[0],
+      evidenceRecords: values[1],
+      evidenceBytes: values[2],
+      checkedAt: new Date().toISOString(),
+    };
+  } catch {
+    /* Keep the dashboard available and surface the failed measurement. */
+  }
   const [
     runs,
     backups,
@@ -42,6 +71,13 @@ export async function getOperationsData(): Promise<OperationsData> {
     runs.map((row) => row.data),
     backup,
   );
+  current.push(...capacityFindings(capacity));
+  if (!backup?.archive || backup.archive.status !== "completed")
+    current.push({
+      id: "archive-unconfirmed",
+      message:
+        "El archivo histórico duradero no tiene una copia verificada en el último respaldo. El contenido de la base se conserva.",
+    });
   current.push(
     ...financeSyncFindings(
       financialStates.map((r) => r.data),
@@ -73,6 +109,7 @@ export async function getOperationsData(): Promise<OperationsData> {
   }
   return {
     backup,
+    capacity,
     lastSuccessfulUpdate,
     repository: process.env.OPS_REPOSITORY,
     alerts: current.map((finding) => {
@@ -127,6 +164,22 @@ const backupInput = z.object({
   counts: z
     .record(z.string().regex(/^[a-z_]+$/), z.number().int().nonnegative())
     .optional(),
+  archive: z
+    .object({
+      status: z.enum(["completed", "failed"]),
+      url: z
+        .string()
+        .regex(
+          /^https:\/\/github\.com\/saulwade\/noticiero-ops\/releases\/tag\/history-\d{4}-\d{2}$/,
+        )
+        .optional(),
+      sha256: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .optional(),
+      bytes: z.number().int().positive().max(40_000_000).optional(),
+    })
+    .optional(),
 });
 export async function recordBackup(raw: unknown) {
   const input = backupInput.parse(raw);
@@ -135,6 +188,11 @@ export async function recordBackup(raw: unknown) {
     (!input.sha256 || !input.bytes || !input.counts)
   )
     throw new Error("Manifiesto incompleto.");
+  if (
+    input.archive?.status === "completed" &&
+    (!input.archive.url || !input.archive.sha256 || !input.archive.bytes)
+  )
+    throw new Error("Manifiesto del archivo incompleto.");
   const data: BackupRun = {
     ...input,
     id: `github-${input.runId}-${input.status}`,

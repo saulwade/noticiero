@@ -7,6 +7,11 @@ import {
   RefreshCw,
 } from "lucide-react";
 import type { DashboardData } from "@/lib/types";
+import {
+  DATABASE_REFERENCE_BYTES,
+  MAX_EVIDENCE_BYTES,
+  MAX_EVIDENCE_RECORDS,
+} from "@/features/storage/capacity";
 const date = (at?: string) =>
   at
     ? new Date(at).toLocaleString("es-MX", { timeZone: "America/Mexico_City" })
@@ -20,6 +25,17 @@ export function OperationsView({
 }) {
   const ops = data.operations;
   const repository = ops?.repository;
+  const capacity = ops?.capacity;
+  const archive = ops?.backup?.archive;
+  const archiveUrl =
+    archive?.url &&
+    /^https:\/\/github\.com\/saulwade\/noticiero-ops\/releases\/tag\/history-\d{4}-\d{2}$/.test(
+      archive.url,
+    )
+      ? archive.url
+      : undefined;
+  const mb = (bytes: number) =>
+    (bytes / 1_000_000).toLocaleString("es-MX", { maximumFractionDigits: 1 });
   const safeRepo =
     repository && /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repository)
       ? repository
@@ -95,6 +111,52 @@ export function OperationsView({
               <ArrowUpRight size={13} />
             </a>
           ) : null}
+          <p aria-label="Estado del archivo histórico">
+            {archive?.status === "completed"
+              ? "Archivo histórico comprimido y cifrado: copia verificada por descarga."
+              : "Archivo histórico: pendiente de una copia verificada."}{" "}
+            Se conserva por separado, sin expiración programada. La base
+            mantiene todo su historial.
+          </p>
+          {archive?.status === "completed" && archiveUrl ? (
+            <a
+              className="inline-link"
+              href={archiveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Ver archivo privado <ArrowUpRight size={13} />
+            </a>
+          ) : null}
+        </article>
+        <article
+          className="operations-card"
+          aria-label="Capacidad de almacenamiento"
+        >
+          <Database size={20} />
+          <span className="eyebrow">ESPACIO Y CONSERVACIÓN</span>
+          <strong>
+            {capacity
+              ? `${mb(capacity.databaseBytes)} MB en la base principal`
+              : "Medición pendiente"}
+          </strong>
+          {capacity ? (
+            <small>
+              {capacity.evidenceRecords.toLocaleString("es-MX")} /{" "}
+              {MAX_EVIDENCE_RECORDS.toLocaleString("es-MX")} versiones de
+              evidencia · {mb(capacity.evidenceBytes)} /{" "}
+              {mb(MAX_EVIDENCE_BYTES)} MB
+            </small>
+          ) : null}
+          <p>
+            Referencia de la base: {mb(DATABASE_REFERENCE_BYTES)} MB. Avisos al
+            70% y 85% de cada margen. No se elimina contenido ni se cambia de
+            plan automáticamente.
+          </p>
+          <small>
+            Medición de la base principal; no incluye otras ramas ni consumo de
+            procesamiento o transferencia del proveedor.
+          </small>
         </article>
       </div>
       <p
