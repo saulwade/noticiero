@@ -94,3 +94,32 @@ it("solo cierra la incidencia al recuperarse, sin ocultar la advertencia pendien
   expect(result.status).toBe(0);
   expect(result.calls[0].body.state).toBe("closed");
 });
+it("comunica cobertura parcial de empresas junto con otra fuente pendiente sin fallar trabajos terminados", () => {
+  const findings = [
+    warning,
+    {
+      id: "finance-stock-evidence",
+      message: "Detalle privado que no debe salir",
+      severity: "warning",
+    },
+  ];
+  const result = run({ findings });
+  expect(result.status).toBe(0);
+  expect(result.calls[0].body.body).toContain(
+    "investigación adicional de empresas",
+  );
+  expect(result.calls[0].body.body).toContain("Colombia");
+  expect(result.calls[0].body.body).not.toContain("Detalle privado");
+  expect(
+    run({
+      findings: [
+        ...findings,
+        {
+          id: "finance-automatic-analysis",
+          message: "Fallo de cálculo",
+          severity: "critical",
+        },
+      ],
+    }).status,
+  ).toBe(1);
+});

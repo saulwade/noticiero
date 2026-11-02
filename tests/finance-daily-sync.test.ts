@@ -9,6 +9,7 @@ import {
   financeSyncFindings as allFinanceSyncFindings,
 } from "@/features/finance/daily-sync";
 import type { Instrument, FinanceSyncState } from "@/features/finance/types";
+import { monitorFailed } from "../scripts/lib/monitor-result.mjs";
 const syncDailyFinance: typeof runDailySync = (at, providers) =>
   runDailySync(at, providers, { clock: () => at!, wait: async () => {} });
 const financeSyncFindings: typeof allFinanceSyncFindings = (
@@ -270,6 +271,61 @@ describe("sincronización diaria privada y acotada", () => {
   });
 });
 describe("alertas de finanzas sin falsas alarmas por fin de semana", () => {
+  it("una fuente auxiliar pendiente no invalida un cálculo completo; un proceso detenido o precio necesario sí falla", () => {
+    const reference: FinanceSyncState = {
+      id: "fx:USD/MXN",
+      label: "FX",
+      provider: "Fixture",
+      status: "ok",
+      message: "ok",
+      lastSuccess: now.toISOString(),
+      asOf: now.toISOString().slice(0, 10),
+    };
+    const optional: FinanceSyncState = {
+      id: "stock-history:ETN",
+      label: "Investigación",
+      provider: "Fixture",
+      status: "error",
+      message: "Fuente pendiente",
+      lastAttempt: now.toISOString(),
+    };
+    const pending = financeSyncFindings([reference, optional], [], now);
+    expect(pending).toEqual([
+      expect.objectContaining({
+        id: "finance-stock-evidence",
+        severity: "warning",
+      }),
+    ]);
+    expect(monitorFailed(pending)).toBe(false);
+    const stopped = financeSyncFindings(
+      [
+        reference,
+        {
+          ...optional,
+          status: "running",
+          lastAttempt: new Date(now.getTime() - 16 * 60000).toISOString(),
+        },
+      ],
+      [],
+      now,
+    );
+    expect(
+      stopped.find((f) => f.id === "finance-stock-evidence")?.severity,
+    ).toBe("critical");
+    expect(monitorFailed(stopped)).toBe(true);
+    expect(
+      monitorFailed(financeSyncFindings([reference, optional], [stock], now)),
+    ).toBe(true);
+    expect(
+      monitorFailed(
+        financeSyncFindings(
+          [{ ...reference, status: "error" }, optional],
+          [],
+          now,
+        ),
+      ),
+    ).toBe(true);
+  });
   it("advierte fallos o leases detenidos, no cobertura manual ni configuración sin posiciones", () => {
     const base: FinanceSyncState = {
       id: "fx:USD/MXN",

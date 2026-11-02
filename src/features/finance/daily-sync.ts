@@ -289,7 +289,7 @@ export function financeSyncFindings(
   states: FinanceSyncState[],
   instruments: Instrument[],
   now = new Date(),
-): { id: string; message: string }[] {
+): { id: string; message: string; severity?: "warning" | "critical" }[] {
   const targets = [
     { id: "fx:USD/MXN", instrument: undefined as Instrument | undefined },
     ...instruments.map((instrument) => ({
@@ -297,18 +297,21 @@ export function financeSyncFindings(
       instrument,
     })),
   ];
-  const result: { id: string; message: string }[] = [];
-  if (
-    states.some(
-      (state) =>
-        state.id.startsWith("stock-") &&
-        (state.status === "error" ||
-          (state.status === "running" &&
-            now.getTime() - Date.parse(state.lastAttempt ?? "") > 15 * 60000)),
-    )
-  )
+  const result: {
+    id: string;
+    message: string;
+    severity?: "warning" | "critical";
+  }[] = [];
+  const stockStates = states.filter((state) => state.id.startsWith("stock-"));
+  const stockStuck = stockStates.some(
+    (state) =>
+      state.status === "running" &&
+      now.getTime() - Date.parse(state.lastAttempt ?? "") > 15 * 60000,
+  );
+  if (stockStuck || stockStates.some((state) => state.status === "error"))
     result.push({
       id: "finance-stock-evidence",
+      severity: stockStuck ? "critical" : "warning",
       message:
         "Finanzas: parte de la investigación automática de empresas tiene fuentes pendientes. Se conserva la evidencia anterior; consulta la cobertura en la app.",
     });

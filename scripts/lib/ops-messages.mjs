@@ -1,4 +1,12 @@
 const messages = {
+  "finance-stock-evidence":
+    "La investigación adicional de empresas tiene fuentes pendientes. El estado y la cobertura se conservan en la app; revisar si requiere atención.",
+  "finance-news-research":
+    "No está confirmado el informe automático de investigación financiera. Revisar el proceso; se conserva el historial anterior.",
+  "finance-automatic-analysis":
+    "No está confirmado el análisis automático del portafolio. Revisar el proceso; se conserva el informe anterior.",
+  "finance-fx-missing":
+    "La referencia USD/MXN está pendiente de actualización. Revisar antes de usar la valoración.",
   "update-missing": "Falta la edición de la última ventana programada.",
   "update-failed": "La última actualización falló.",
   "update-partial": "La última edición quedó incompleta; hay datos pendientes.",
