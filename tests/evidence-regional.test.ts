@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   collectColombia,
   collectProfeco,
+  collectProfecoTelecom,
   PROFECO_RESOURCE,
 } from "@/features/evidence/regional-connectors";
 import { buildDossiers } from "@/features/evidence/engine";
@@ -30,6 +31,97 @@ const total = {
 };
 
 describe("fuentes oficiales regionales acotadas", () => {
+  it("reinicia sólo el recorrido al cambiar a orden por fecha y conserva el offset anterior", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(profeco([row]));
+    const batch = await collectProfeco(
+      {
+        id: "profeco",
+        status: "limited",
+        count: 20,
+        checkedAt: "",
+        message: "legacy",
+        cursor: JSON.stringify({ offset: 80, headNext: false }),
+      },
+      now,
+      fetcher,
+    );
+    expect(
+      new URL(String(fetcher.mock.calls[0][0])).searchParams.get("offset"),
+    ).toBe("0");
+    expect(JSON.parse(batch.state.cursor!)).toMatchObject({
+      version: "date-v1",
+      legacyOffset: 80,
+    });
+  });
+  it("telecom usa su esquema oficial y conserva fecha original, resolución y privacidad", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      profeco([
+        {
+          ...row,
+          id_expediente: undefined,
+          expediente: "PFC.H.A.2/000359-2026",
+          fecha_ingreso: "2026/01/28",
+          estado_procesal: "Conciliada",
+          correo: "private@example.com",
+        },
+      ]),
+    );
+    const batch = await collectProfecoTelecom(undefined, now, fetcher);
+    expect(batch.records[0]).toMatchObject({
+      source: "profeco-telecom",
+      occurredAt: "2026-01-28",
+      resolution: "resolved",
+      historical: true,
+    });
+    expect(batch.records[0].authorKey).toBeUndefined();
+    expect(JSON.stringify(batch.records)).not.toContain("private@example");
+    expect(
+      new URL(String(fetcher.mock.calls[0][0])).searchParams.get("fields"),
+    ).toContain("expediente,fecha_ingreso");
+    expect(batch.state.message).toContain("mismo organismo");
+  });
+  it("telecom rechaza fecha imposible o futura sin fabricar filas", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      profeco([
+        { ...row, expediente: "a", fecha_ingreso: "2026/02/30" },
+        { ...row, expediente: "b", fecha_ingreso: "8240/01/05" },
+      ]),
+    );
+    const batch = await collectProfecoTelecom(undefined, now, fetcher);
+    expect(batch.records).toHaveLength(0);
+    expect(batch.state.status).toBe("error");
+  });
+  it("telecom conserva orden/cursor y Retry-After sin consultar durante el enfriamiento", async () => {
+    const previous = {
+      id: "profeco-telecom" as const,
+      status: "limited" as const,
+      count: 20,
+      checkedAt: "",
+      message: "sample",
+      cursor: JSON.stringify({
+        version: "date-v1",
+        offset: 40,
+        headNext: false,
+      }),
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response("", { status: 429, headers: { "retry-after": "86400" } }),
+      );
+    const batch = await collectProfecoTelecom(previous, now, fetcher);
+    expect(JSON.parse(batch.state.cursor!)).toMatchObject({
+      version: "date-v1",
+      offset: 40,
+      headNext: false,
+    });
+    await collectProfecoTelecom(
+      batch.state,
+      new Date(now.getTime() + 1000),
+      fetcher,
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it("consulta el datastore mexicano con campos permitidos, no el CSV completo", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(profeco([row]));
     const batch = await collectProfeco(undefined, now, fetcher);
@@ -37,6 +129,7 @@ describe("fuentes oficiales regionales acotadas", () => {
     expect(url.origin).toBe("https://www.datos.gob.mx");
     expect(url.searchParams.get("resource_id")).toBe(PROFECO_RESOURCE);
     expect(url.searchParams.get("limit")).toBe("20");
+    expect(url.searchParams.get("sort")).toBe("fecha_ingreso desc, _id desc");
     expect(url.searchParams.get("fields")).not.toMatch(
       /correo|telefono|domicilio/,
     );
@@ -123,7 +216,11 @@ describe("fuentes oficiales regionales acotadas", () => {
     const capped = await collectProfeco(
       {
         ...first.state,
-        cursor: JSON.stringify({ offset: 10000, headNext: false }),
+        cursor: JSON.stringify({
+          version: "date-v1",
+          offset: 10000,
+          headNext: false,
+        }),
       },
       now,
       fetcher,

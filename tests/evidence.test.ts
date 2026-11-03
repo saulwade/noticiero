@@ -233,7 +233,7 @@ describe("evidencia contextual y persistencia", () => {
       decision: "rejected",
       note: "Descartar caso actual",
     });
-    expect((await getEvidenceData(now)).dossiers).toHaveLength(0);
+    expect((await getEvidenceData()).dossiers).toHaveLength(0);
   });
   it("acota la vista sin borrar los registros completos del archivo", async () => {
     const db = await getDb();

@@ -3,6 +3,12 @@ import { hash } from "@/features/news/normalize";
 import { terms } from "./vector";
 import { authoredText, isSpeculation, normalizedText } from "./evidence-text";
 import { problemScope } from "./problem-scope";
+import {
+  isEditorialReflection,
+  isHypothetical,
+  isRecruitment,
+  operationalFailure,
+} from "./content-quality";
 
 const request =
   /\b(looking for|is there (?:a|any)|does anyone|any (?:tool|recommendation|alternative)|(?:can|could|would) (?:anyone|someone|you) recommend|please recommend|need (?:a|an|some|help)|wish (?:there|i|we)|busco|necesito|alguien (?:conoce|sabe)|existe alguna|alternativa a)\b/i;
@@ -20,10 +26,18 @@ export function classifySignal(
 ): ResearchSignal["kind"] | undefined {
   sentence = normalizedText(authoredText(sentence));
   if (
-    !problemScope(sentence) ||
+    isRecruitment(sentence) ||
+    isHypothetical(sentence) ||
+    isEditorialReflection(sentence) ||
+    (!problemScope(sentence) && !operationalFailure.test(sentence)) ||
     isSpeculation(sentence) ||
     !personal.test(sentence) ||
-    !processContext.test(sentence) ||
+    !(
+      processContext.test(sentence) ||
+      /\b(?:firefox|browser|android|ios|backup|sync|permissions?|dialogs?|videos?|pages?|loading)\b/i.test(
+        sentence,
+      )
+    ) ||
     /\b(?:cannot|can['’]t) recommend\b/i.test(sentence) ||
     // An offer to help somebody else find a file is not the author's request.
     /\bif\b.*\byou (?:were|are) looking for\b.*\b(?:let me know|i (?:have|can))\b/i.test(
@@ -40,7 +54,7 @@ export function classifySignal(
   if (request.test(sentence)) return "request";
   // A generic "you can't" in advice does not describe the author's own obstacle.
   if (
-    pain.test(sentence) &&
+    (pain.test(sentence) || operationalFailure.test(sentence)) &&
     (!/\b(can['’]t|cannot)\b/i.test(sentence) ||
       firstPersonBlock.test(sentence))
   )
@@ -55,6 +69,7 @@ export function extractSignals(
 ): ResearchSignal[] {
   // Community statements are demand signals; editorial news and YC RFS are context only.
   if (story.kind !== "question" && story.kind !== "comment") return [];
+  if (isRecruitment(story.originalTitle ?? story.title)) return [];
   // A reply must speak for itself: the parent's request is not the reply author's claim.
   const content =
     story.kind === "comment"

@@ -7,6 +7,7 @@ export type ProblemScope = {
   segment: string;
   product: string;
   domain: string;
+  mechanism?: string;
 };
 /** These generic words preserve an observation but cannot establish a shared job. */
 export function isSpecificScope(scope: ProblemScope) {
@@ -139,12 +140,165 @@ const tasks: [string, string, RegExp][] = [
   ],
 ];
 
+// Mechanisms require explicit text. Co-mentioning a vendor does not establish
+// that two people encountered the same failure or need the same intervention.
+const mechanisms: [string, string, string, RegExp][] = [
+  [
+    "credential-rotation",
+    "account-access",
+    "Recuperar acceso y autenticación",
+    /\b(?:password|credential|contrasena)\b.{0,30}\b(?:rotation|rotat\w*|cambio)\b|\brotat\w*\b.{0,30}\b(?:password|credential|contrasena)\b/,
+  ],
+  [
+    "custom-role-pooler",
+    "account-access",
+    "Recuperar acceso y autenticación",
+    /\b(?:custom|restricted)\b.{0,45}\b(?:role|roles)\b[\s\S]{0,100}\b(?:supavisor|pooler)\b|\bsupavisor\b.{0,60}\bcustom\b/,
+  ],
+  [
+    "pam-authentication",
+    "account-access",
+    "Recuperar acceso y autenticación",
+    /\bpam\s+authentication\b/,
+  ],
+  [
+    "jwt-validation",
+    "account-access",
+    "Recuperar acceso y autenticación",
+    /\bpgrst303\b|\bjwt\b.{0,60}\b(?:reject\w*|validat\w*|claim\w*)\b/,
+  ],
+  [
+    "extension-ownership",
+    "security-workflow",
+    "Proteger accesos y procesos",
+    /\bspatial_ref_sys\b/,
+  ],
+  [
+    "row-security-write",
+    "account-access",
+    "Recuperar acceso y autenticación",
+    /\brls\b.{0,50}\b(?:policy|policies|insert|writes?)\b|\brow.level security\b/,
+  ],
+  [
+    "backup-vpn",
+    "data-integration",
+    "Conectar y sincronizar herramientas",
+    /\b(?:vpn|unmetered)\b[\s\S]{0,150}\b(?:backup|sync|connection)\b|\b(?:backup|sync)\b[\s\S]{0,150}\bvpn\b/,
+  ],
+  [
+    "backup-background",
+    "data-integration",
+    "Conectar y sincronizar herramientas",
+    /\b(?:background|segundo plano)\b.{0,80}\b(?:backup|upload|sync)\b|\b(?:backup|sync|upload)\b[\s\S]{0,200}\b(?:minimize|background|app.{0,15}closed)\b/,
+  ],
+  [
+    "backup-cellular-policy",
+    "data-integration",
+    "Conectar y sincronizar herramientas",
+    /\bbackup\b[\s\S]{0,140}\bcellular\b/,
+  ],
+  [
+    "queue-persistence",
+    "workflow-recovery",
+    "Recuperar ejecuciones fallidas",
+    /\bredis\b[\s\S]{0,250}\b(?:volume|persist\w*)\b/,
+  ],
+  [
+    "missing-job-retry",
+    "workflow-recovery",
+    "Recuperar ejecuciones fallidas",
+    /\b(?:no retry|no retries|without retry|silently dropped)\b/,
+  ],
+  [
+    "deposit-return",
+    "refund",
+    "Recuperar depósitos y anticipos",
+    /\b(?:devolucion de deposito|devolver.{0,20}(?:deposito|anticipo)|deposit refund|return.{0,15}deposit)\b/,
+  ],
+  [
+    "goods-return",
+    "refund",
+    "Gestionar cambios y devoluciones",
+    /\b(?:cambio o devolucion|return.{0,20}(?:goods|merchandise)|product refund)\b/,
+  ],
+  [
+    "contract-cancellation",
+    "refund",
+    "Gestionar cancelaciones de contratos",
+    /\b(?:rescision del contrato|cancelacion.{0,20}contrato|contract cancellation)\b/,
+  ],
+  [
+    "warranty-refusal",
+    "product-repair",
+    "Hacer efectiva una garantía",
+    /\b(?:hacer efectiva la garantia|warranty.{0,30}(?:refus\w*|denied))\b/,
+  ],
+  [
+    "repair-quality",
+    "product-repair",
+    "Corregir reparaciones deficientes",
+    /\b(?:deficiencia en la reparacion|faulty repair|poor repair)\b/,
+  ],
+  [
+    "unsolicited-product",
+    "order-tracking",
+    "Aclarar productos no solicitados",
+    /\b(?:producto o servicio no solicitado|unsolicited product)\b/,
+  ],
+  [
+    "credit-identity",
+    "record-correction",
+    "Corregir información crediticia ajena",
+    /\binformation belongs to someone else\b/,
+  ],
+  [
+    "credit-status",
+    "record-correction",
+    "Corregir el estado de una cuenta",
+    /\baccount status incorrect\b/,
+  ],
+  [
+    "credit-values",
+    "record-correction",
+    "Corregir datos de una cuenta",
+    /\baccount information incorrect\b/,
+  ],
+  [
+    "credit-investigation",
+    "record-correction",
+    "Dar seguimiento a correcciones crediticias",
+    /\binvestigation\b.{0,60}\b(?:problem|error|fix)\b/,
+  ],
+  [
+    "debt-not-owed",
+    "record-correction",
+    "Aclarar cobros de deuda ajena",
+    /\b(?:debt not owed|debt is not yours)\b/,
+  ],
+  [
+    "debt-collection-threat",
+    "payments",
+    "Aclarar prácticas de cobranza",
+    /\b(?:threatened|threats?)\b.{0,80}\b(?:credit|legal|action)\b/,
+  ],
+];
+
 export function problemScope(
   text: string,
   product = "",
   segment = "",
 ): ProblemScope | undefined {
   const normalized = normalizedText(text);
+  const mechanismText = normalized
+    .split(/;|\n|\b(?:but|although|even though|however|pero|aunque)\b/)
+    .filter(
+      (clause) =>
+        !/\b(?:ruled out|not caused by|not due to|unrelated to|not related to|there (?:was|is) no|(?:we|i) (?:do|did) not (?:use|change|rotate)|not using|no password rotation|no credential rotation|no hubo|no usamos|descartamos)\b/.test(
+          clause,
+        ),
+    )
+    .join(" ");
+  const mechanism = mechanisms.find((m) => m[3].test(mechanismText));
   if (
     /\b(?:environmental|societal|social|ambiental)\s+cost\w*\b/.test(normalized)
   )
@@ -166,9 +320,14 @@ export function problemScope(
       "workflow-recovery",
     ].includes(m.task[0]),
   );
-  const task = (
-    rootCauses.length ? rootCauses : specific.length ? specific : matches
-  ).sort((a, b) => a.index - b.index)[0]?.task;
+  const task = mechanism
+    ? ([mechanism[1], mechanism[2], mechanism[3]] as const)
+    : (rootCauses.length
+        ? rootCauses
+        : specific.length
+          ? specific
+          : matches
+      ).sort((a, b) => a.index - b.index)[0]?.task;
   if (!task) return;
   const role = normalized.match(rolePattern)?.[0] ?? "";
   const roleKey = /accountant|contador|contable|bookkeeper/.test(role)
@@ -207,9 +366,16 @@ export function problemScope(
     segment: buyer,
     product: normalizedText(provider),
     domain,
+    ...(mechanism ? { mechanism: mechanism[0] } : {}),
   };
   return {
     ...scope,
-    key: [scope.task, scope.domain, scope.product, scope.segment].join(":"),
+    key: [
+      scope.task,
+      scope.domain,
+      scope.product,
+      scope.segment,
+      ...(mechanism ? [mechanism[0]] : []),
+    ].join(":"),
   };
 }

@@ -11,7 +11,11 @@ import {
 import { hash, safePublicUrl } from "@/features/news/normalize";
 import { buildDossiers, weeklyReport } from "./engine";
 import { collectCfpb, collectGithub } from "./connectors";
-import { collectColombia, collectProfeco } from "./regional-connectors";
+import {
+  collectColombia,
+  collectProfeco,
+  collectProfecoTelecom,
+} from "./regional-connectors";
 import { parseProfecoCsv } from "./profeco";
 import { editionFor } from "@/lib/time";
 import { evidenceCoverage, researchShortlist } from "./shortlist";
@@ -33,6 +37,7 @@ const defaults: ConnectorState[] = [
   "github",
   "cfpb",
   "profeco",
+  "profeco-telecom",
   "sfc-co",
 ].map((id) => ({
   id: id as ConnectorState["id"],
@@ -283,6 +288,7 @@ export async function refreshEvidence(
     ["cfpb", collectCfpb],
     ["github", collectGithub],
     ["profeco", collectProfeco],
+    ["profeco-telecom", collectProfecoTelecom],
     ["sfc-co", collectColombia],
   ] as const) {
     const previous = old.sources.find((s) => s.id === id);

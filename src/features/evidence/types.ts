@@ -1,4 +1,5 @@
-export type EvidenceSource = "hn" | "github" | "cfpb" | "profeco" | "sfc-co";
+export type EvidenceSource =
+  "hn" | "github" | "cfpb" | "profeco" | "profeco-telecom" | "sfc-co";
 export type EvidenceRecord = {
   revision?: number;
   id: string;
@@ -80,6 +81,7 @@ export type EvidenceWeeklyReport = {
   generatedAt: string;
   provisional: boolean;
   markdown: string;
+  comparisons?: import("./timeline").EvidenceTimeline[];
 };
 export type EvidenceData = {
   records: EvidenceRecord[];

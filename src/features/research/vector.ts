@@ -1,11 +1,17 @@
 import type { ResearchModel, Story } from "@/lib/types";
 
 const stopwords = new Set(
-  "the a an and or to of for in on at by with from that this these those it its is are was were be been being as i we you they he she my our your their me us them not no do does did have has had can could would should will just very really also more most much many some any all about into than then there here when where what which who why how out up down over under through again get got use using used want need looking anyone ask show hn tool tools solution solutions problem problems please thanks thank help new people like make work works one two something things thing know way de del la el los las un una unos unas y o que qué en por para con sin al es son fue ser se mi mis nuestra nuestro tus su sus este esta estos estas hay como cómo mas más muy ya pero porque quiero necesito busco alguien hacer tengo tiene tiene esto eso asi así herramienta herramientas solución soluciones problema problemas ayuda favor gracias gente forma día días time times today".split(
+  "says said first actually pro the a an and or to of for in on at by with from that this these those it its is are was were be been being as i we you they he she my our your their me us them not no do does did have has had can could would should will just very really also more most much many some any all about into than then there here when where what which who why how out up down over under through again get got use using used want need looking anyone ask show hn tool tools solution solutions problem problems please thanks thank help new people like make work works one two something things thing know way de del la el los las un una unos unas y o que qué en por para con sin al es son fue ser se mi mis nuestra nuestro tus su sus este esta estos estas hay como cómo mas más muy ya pero porque quiero necesito busco alguien hacer tengo tiene tiene esto eso asi así herramienta herramientas solución soluciones problema problemas ayuda favor gracias gente forma día días time times today".split(
     /\s+/,
   ),
 );
 const aliases: Record<string, string> = {
+  agents: "agente",
+  agent: "agente",
+  agentes: "agente",
+  models: "modelo",
+  model: "modelo",
+  modelos: "modelo",
   llm: "ia",
   llms: "ia",
   ai: "ia",
@@ -89,7 +95,12 @@ export function trainModel(
   stories: Story[],
   now = new Date(),
 ): ResearchModel {
-  const documents = { ...(previous?.documents ?? {}) };
+  const documents = Object.fromEntries(
+    Object.entries(previous?.documents ?? {}).map(([id, doc]) => [
+      id,
+      { ...doc, terms: [...new Set(terms(doc.terms.join(" ")))] },
+    ]),
+  );
   for (const story of stories) {
     if (documents[story.id]?.hash === story.contentHash) continue;
     documents[story.id] = {
@@ -147,7 +158,7 @@ export function cosine(a: Record<string, number>, b: Record<string, number>) {
   );
 }
 export function keywords(tokens: string[], model: ResearchModel, limit = 6) {
-  return Object.entries(vector(tokens, model))
+  return Object.entries(vector(terms(tokens.join(" ")), model))
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([key]) => key);

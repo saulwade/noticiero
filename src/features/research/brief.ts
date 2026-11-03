@@ -3,6 +3,12 @@ import { getDb } from "@/db/client";
 import { savedItems } from "@/db/schema";
 import { editionFor } from "@/lib/time";
 import { getEvidenceData } from "@/features/evidence/service";
+import {
+  evidenceTimeline,
+  timelineMarkdown,
+} from "@/features/evidence/timeline";
+import { timelineAssessor } from "@/features/evidence/engine";
+import { keywordSummary } from "./keyword-summary";
 const plain = (value: string) => value.replace(/[<>]/g, "");
 export async function researchBrief(days: number, now = new Date()) {
   const [research, saved, evidence] = await Promise.all([
@@ -52,6 +58,19 @@ export async function researchBrief(days: number, now = new Date()) {
     );
   }
   lines.push(
+    "## Comparación automática de la muestra",
+    "",
+    ...[7, 30, 90].flatMap((window) =>
+      timelineMarkdown(
+        evidenceTimeline(
+          evidence.records,
+          timelineAssessor(evidence.reviews, now),
+          now,
+          window,
+        ),
+      ),
+    ),
+    "",
     "## Cobertura regional documentada",
     "",
     ...(evidence.coverage ?? []).map(
@@ -61,6 +80,15 @@ export async function researchBrief(days: number, now = new Date()) {
     "",
   );
   lines.push("## Temas y palabras clave de las noticias (contexto)", "");
+  const contextKeywords = keywordSummary(research.observations ?? [], from, to);
+  lines.push(
+    `${contextKeywords.documents} documentos distintos con observaciones en la ventana. Repeticiones de una palabra en el mismo documento o revisiones del mismo contenido no multiplican este recuento. Son temas de cobertura, no intención de compra.`,
+    "",
+    ...contextKeywords.keywords.map(
+      (k) => `- ${k.term}: ${k.documents} documentos etiquetados.`,
+    ),
+    "",
+  );
   for (const observation of (research.observations ?? []).filter((item) =>
     inRange(item.at),
   )) {

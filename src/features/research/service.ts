@@ -22,6 +22,7 @@ import { editionFor } from "@/lib/time";
 import { hash } from "@/features/news/normalize";
 import { recordOpportunity } from "./archive";
 import { authoredText } from "./evidence-text";
+import { isRecruitment } from "./content-quality";
 
 export async function getResearchData(): Promise<ResearchData> {
   const db = await getDb();
@@ -49,6 +50,7 @@ export async function getResearchData(): Promise<ResearchData> {
   const sources = new Map(community.map((s) => [s.id, s]));
   const comparableText = (value: string) => value.replace(/\s+/g, " ").trim();
   const accepted = signals.flatMap((row) => {
+    if (isRecruitment(row.data.title)) return [];
     const quote = authoredText(row.data.quote);
     const source = sources.get(row.data.storyId);
     // A newly retained paragraph boundary can prove that a legacy flattened

@@ -10,6 +10,8 @@ import { editionFor, TIME_ZONE } from "@/lib/time";
 import { proposeLocalOpportunities } from "./opportunities";
 import { isRelevantStory } from "@/features/news/relevance";
 import { groupStories, rankStories } from "@/features/news/deduplicate";
+import { keywordSummary } from "./keyword-summary";
+import { terms } from "./vector";
 
 const clean = (text: string) =>
   text
@@ -129,6 +131,28 @@ export function createDailyReport(
     `- Motor: TF-IDF para palabras clave y reglas explícitas de atribución, tarea, producto y segmento para agrupar; sin API de IA.`,
     "",
   ];
+  const contextKeywords = keywordSummary(
+    documents
+      .filter((s) => s.kind !== "comment" && s.kind !== "research")
+      .map((s) => ({
+        id: s.id,
+        storyId: s.id,
+        at: s.detectedAt,
+        keywords: terms(`${s.originalTitle ?? s.title} ${s.excerpt}`),
+      })),
+    date,
+    date,
+  );
+  lines.push(
+    "## Palabras clave del contexto",
+    "",
+    `${contextKeywords.documents} documentos; frecuencia por documento, no por menciones. Los temas y marcas no demuestran demanda de clientes.`,
+    "",
+    ...contextKeywords.keywords.map(
+      (k) => `- ${k.term}: ${k.documents} documentos.`,
+    ),
+    "",
+  );
   lines.push(
     "## Noticias de la jornada",
     "",
@@ -212,6 +236,7 @@ export function createDailyReport(
         news,
         themes,
         provisional,
+        contextKeywords,
       }),
     ),
     provisional,

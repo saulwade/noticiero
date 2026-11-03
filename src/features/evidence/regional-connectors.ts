@@ -11,6 +11,8 @@ import type {
 
 export const PROFECO_RESOURCE = "e93eee6a-014b-4836-b47e-04744bfe109f";
 export const PROFECO_CATALOG = `https://www.datos.gob.mx/dataset/quejas_materia_servicios/resource/${PROFECO_RESOURCE}`;
+export const PROFECO_TELECOM_RESOURCE = "fd854822-65a6-47d1-86f9-5b406b72dd6d";
+export const PROFECO_TELECOM_CATALOG = `https://www.datos.gob.mx/dataset/quejas_materia_telecomunicaciones/resource/${PROFECO_TELECOM_RESOURCE}`;
 export const COLOMBIA_CATALOG = "https://www.datos.gov.co/d/xyy7-rn7p";
 const CAP = 20;
 const value = z.string().min(1).max(3000);
@@ -94,9 +96,10 @@ function fail(
       /* Retain the valid provider cooldown on a malformed legacy cursor. */
     }
   }
-  if (id === "profeco" && batch.state.blocked) {
+  if ((id === "profeco" || id === "profeco-telecom") && batch.state.blocked) {
     try {
       batch.state.cursor = JSON.stringify({
+        ...JSON.parse(previous?.cursor ?? "{}"),
         ...JSON.parse(batch.state.cursor ?? "{}"),
         offset: position(previous),
       });
@@ -107,55 +110,93 @@ function fail(
   return batch;
 }
 
-/** Official datastore sample; never download its 250 MB CSV or an unbounded catalog. */
-export async function collectProfeco(
+/** Official bounded samples; resources share an authority, never independent voices. */
+export function collectProfeco(
   previous?: ConnectorState,
   now = new Date(),
   fetcher: typeof fetch = fetch,
+) {
+  return collectProfecoResource("profeco", previous, now, fetcher);
+}
+export function collectProfecoTelecom(
+  previous?: ConnectorState,
+  now = new Date(),
+  fetcher: typeof fetch = fetch,
+) {
+  return collectProfecoResource("profeco-telecom", previous, now, fetcher);
+}
+async function collectProfecoResource(
+  id: "profeco" | "profeco-telecom",
+  previous: ConnectorState | undefined,
+  now: Date,
+  fetcher: typeof fetch,
 ): Promise<ConnectorBatch> {
-  const paused = cooldown("profeco", previous, now);
+  const paused = cooldown(id, previous, now);
   if (paused) return paused;
   try {
-    const offset = position(previous);
-    let headNext = offset === 0;
+    const telecom = id === "profeco-telecom";
+    let cursor: {
+      version?: string;
+      offset?: number;
+      headNext?: boolean;
+      legacyOffset?: number;
+    } = {};
     try {
-      headNext = JSON.parse(previous?.cursor ?? "{}").headNext ?? headNext;
+      cursor = JSON.parse(previous?.cursor ?? "{}");
     } catch {
-      /* Start with current head. */
+      /* Reset malformed traversal without touching evidence. */
     }
+    const currentOrder = cursor.version === "date-v1";
+    const offset = currentOrder ? position(previous) : 0;
+    const headNext = currentOrder ? (cursor.headNext ?? offset === 0) : true;
     const requestedOffset = headNext ? 0 : offset;
     const url = new URL(
       "https://www.datos.gob.mx/api/3/action/datastore_search",
     );
     url.search = new URLSearchParams({
-      resource_id: PROFECO_RESOURCE,
+      resource_id: telecom ? PROFECO_TELECOM_RESOURCE : PROFECO_RESOURCE,
       limit: String(CAP),
       offset: String(requestedOffset),
-      sort: "_id desc",
-      fields:
-        "id_expediente,fecha_ingreso,nombre_comercial,giro,motivo_reclamacion,estado_procesal",
+      sort: "fecha_ingreso desc, _id desc",
+      fields: `${telecom ? "expediente" : "id_expediente"},fecha_ingreso,nombre_comercial,giro,motivo_reclamacion,estado_procesal`,
     }).toString();
-    const data = profecoSchema.parse(await publicJson(url, now, fetcher));
-    const records: EvidenceRecord[] = [];
+    const raw = await publicJson(url, now, fetcher);
+    // Only the documented telecom ID alias differs; never infer a schema from arbitrary columns.
+    if (telecom && raw && typeof raw === "object") {
+      const result = (raw as { result?: { records?: unknown } }).result;
+      if (Array.isArray(result?.records))
+        result.records = result.records.map((r: Record<string, unknown>) => ({
+          ...r,
+          id_expediente: r.expediente,
+        }));
+    }
+    const data = profecoSchema.parse(raw),
+      records: EvidenceRecord[] = [];
     for (const row of data.result.records) {
-      const day = calendar(row.fecha_ingreso, now);
-      if (!day) continue;
+      if (!/^[\p{L}\p{N}./_ -]{1,120}$/u.test(row.id_expediente)) continue;
+      const rawDate = telecom
+        ? row.fecha_ingreso.replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, "$1-$2-$3")
+        : row.fecha_ingreso;
+      const date = calendar(rawDate, now);
+      if (!date) continue;
       const issue = clean(row.motivo_reclamacion),
         sector = clean(row.giro),
         status = clean(row.estado_procesal);
       if (!issue || !sector) continue;
       records.push({
-        id: `profeco:${hash(row.id_expediente)}`,
+        id: `${id}:${hash(row.id_expediente)}`,
         externalId: row.id_expediente,
-        source: "profeco",
-        sourceName: "PROFECO · datos.gob.mx",
-        url: PROFECO_CATALOG,
+        source: id,
+        sourceName: telecom
+          ? "PROFECO · telecomunicaciones (CC BY 4.0)"
+          : "PROFECO · datos.gob.mx",
+        url: telecom ? PROFECO_TELECOM_CATALOG : PROFECO_CATALOG,
         title: issue,
         quote: `Motivo administrativo: ${issue}. Giro: ${sector}. Estado procesal: ${status}. Registro estructurado, sin narrativa personal.`,
         issue,
         product: clean(row.nombre_comercial),
         segment: `Usuarios · ${sector}`,
-        occurredAt: day,
+        occurredAt: date,
         capturedAt: now.toISOString(),
         language: "es",
         kind: "complaint",
@@ -163,7 +204,7 @@ export async function collectProfeco(
         countryBasis:
           "Registro del conjunto oficial nacional de PROFECO; no se infiere residencia individual.",
         historical:
-          Date.parse(`${day}T12:00:00Z`) < now.getTime() - 30 * 86400000,
+          Date.parse(`${date}T12:00:00Z`) < now.getTime() - 30 * 86400000,
         resolution: /^conciliada$/i.test(status)
           ? "resolved"
           : /^no conciliada$/i.test(status)
@@ -171,6 +212,8 @@ export async function collectProfeco(
             : "unknown",
       });
     }
+    if (data.result.records.length > 0 && records.length === 0)
+      throw new Error("La muestra no contiene fechas/campos válidos.");
     const exhausted = data.result.records.length < CAP;
     const nextOffset = exhausted
       ? 0
@@ -179,22 +222,28 @@ export async function collectProfeco(
         : offset + CAP >= 10000
           ? CAP
           : offset + CAP;
+    const latest = records
+      .map((r) => r.occurredAt)
+      .sort()
+      .at(-1);
     return {
       records,
       state: {
-        id: "profeco",
+        id,
         status: "limited",
         checkedAt: now.toISOString(),
         count: records.length,
         cursor: JSON.stringify({
+          version: "date-v1",
           offset: nextOffset,
           headNext: exhausted || !headNext,
+          legacyOffset: currentOrder ? cursor.legacyOffset : position(previous),
         }),
-        message: `Muestra automática de hasta ${CAP} casos por ciclo del datastore oficial; alterna publicaciones de cabecera y antecedentes paginados. Fecha original y estado conservados; los antecedentes no prueban demanda actual. ${data.result.records.length - records.length} filas descartadas por fecha/campos inválidos. Cobertura parcial; sin narrativa ni datos de denunciantes.`,
+        message: `Muestra automática de hasta ${CAP} casos por ciclo del datastore oficial; cabecera por fecha y antecedentes paginados. ${data.result.records.length - records.length} filas descartadas por fecha/campos inválidos. Última fecha válida en este lote: ${latest ?? "ninguna"}. Fecha original y estado conservados; los antecedentes no prueban demanda actual. Cobertura parcial; sin narrativa ni datos de denunciantes. ${telecom ? "Recurso de telecomunicaciones del mismo organismo; no es una familia independiente de PROFECO." : ""}`,
       },
     };
   } catch (error) {
-    return fail("profeco", previous, now, error);
+    return fail(id, previous, now, error);
   }
 }
 

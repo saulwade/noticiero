@@ -17,16 +17,25 @@ import {
   isSpecificScope,
   problemScope,
 } from "@/features/research/problem-scope";
-import { latestEvidenceVersions } from "./versions";
+import {
+  evidenceCaseKey,
+  evidenceFamily,
+  latestEvidenceVersions,
+} from "./versions";
+import {
+  isHypothetical,
+  isRecruitment,
+  operationalFailure,
+  reportsResolution,
+} from "@/features/research/content-quality";
+import { evidenceTimeline, timelineMarkdown } from "./timeline";
 
-export const ENGINE_VERSION = "evidence-v2";
+export const ENGINE_VERSION = "evidence-v3";
 export const evidenceDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : editionFor(new Date(value)).date;
 const normalized = normalizedText;
 const friction =
   /\b(cannot|can['’]t|doesn['’]t|unable|blocked|restrict\w*|frustrat\w*|too expensive|burned through|exhausted|takes? (?:hours|days)|manually|looking for|need (?:a|an|help)|missing|failed|fails|crash\w*|broken|bug|incorrect|inaccurate|not receiv\w*|no puedo|no funciona|bloque\w*|necesito|busco|manual\w*|demora\w*|problema|incumpl\w*|negativa|no entreg\w*)\b/i;
-const resolved =
-  /\b(resolved|fixed|solved|works now|solucionado|resuelto|ya funciona)\b/i;
 function grounded(text: string, pattern: RegExp): GroundedField | undefined {
   const sentence = authoredText(text)
     .split(/(?<=[.!?])\s+/)
@@ -40,23 +49,16 @@ export function problemContext(record: EvidenceRecord) {
   const scopedText =
     record.kind === "complaint" ? `${record.issue ?? ""} ${own}` : own;
   const scope = problemScope(scopedText, record.product, record.segment);
-  const text = normalized(own);
-  const correction =
-    record.resolution === "resolved" ||
-    (resolved.test(text) &&
-      !/\b(not resolved|not fixed|unresolved|no resuelto|sin resolver)\b/i.test(
-        text,
-      ));
+  const correction = record.resolution === "resolved" || reportsResolution(own);
   const githubCase =
     record.source === "github" &&
     own.length > 20 &&
-    /\b(crash\w*|failed|fails|bug|broken|freez\w*|incorrect|not (?:work|detect|receiv)\w*|cannot|can['’]t)\b/i.test(
-      own,
-    );
+    operationalFailure.test(`${record.title}. ${own}`);
   const accepted =
     record.kind !== "statistic" &&
-    Boolean(scope) &&
     Boolean(own) &&
+    !isRecruitment(`${record.title}. ${own}`) &&
+    !isHypothetical(own) &&
     (record.kind === "complaint" || Boolean(classifySignal(own)) || githubCase);
   const fields: ProblemDossier["fields"] = {
     segment: grounded(record.quote, rolePattern),
@@ -64,7 +66,10 @@ export function problemContext(record: EvidenceRecord) {
       record.quote,
       /\b(trying to|need to|looking for|need a|intentando|necesito|busco)\b/i,
     ),
-    obstacle: accepted ? grounded(record.quote, friction) : undefined,
+    obstacle: accepted
+      ? (grounded(record.quote, operationalFailure) ??
+        grounded(record.quote, friction))
+      : undefined,
     frequency: grounded(
       record.quote,
       /\b(every|daily|weekly|monthly|each|cada|diario|semanal|mensual)\b/i,
@@ -90,32 +95,51 @@ export function problemContext(record: EvidenceRecord) {
 function groupKey(record: EvidenceRecord, topic: string) {
   const scope = problemContext(record).scope;
   const specificity =
-    scope && !isSpecificScope(scope)
+    !scope || !isSpecificScope(scope)
       ? `:${record.source}:${record.externalId}`
       : "";
   return `${scope?.key ?? `${topic}:${normalized(record.product ?? record.source)}`}:${record.country ?? "unknown"}${specificity}`;
+}
+export function timelineAssessment(record: EvidenceRecord) {
+  const context = problemContext(record);
+  if (record.kind === "statistic" || (!context.accepted && !context.correction))
+    return;
+  const label = context.topic ?? "Problema por clasificar";
+  return { key: groupKey(record, label), label, resolved: context.correction };
+}
+export function timelineAssessor(reviews: EvidenceReview[], now = new Date()) {
+  const decisions = new Map(
+    reviews
+      .filter((r) => Date.parse(r.at) <= now.getTime())
+      .map((r) => [r.id, r.decision]),
+  );
+  return (record: EvidenceRecord) => {
+    const decision = decisions.get(record.id);
+    return decision && decision !== "useful"
+      ? undefined
+      : timelineAssessment(record);
+  };
 }
 export function buildDossiers(
   records: EvidenceRecord[],
   reviews: EvidenceReview[],
   now = new Date(),
 ): ProblemDossier[] {
-  const reviewMap = new Map(reviews.map((r) => [r.id, r]));
+  const reviewMap = new Map(
+    reviews
+      .filter((r) => Date.parse(r.at) <= now.getTime())
+      .map((r) => [r.id, r]),
+  );
   const groups = new Map<string, EvidenceRecord[]>();
-  const latestCases = new Map<string, EvidenceRecord>();
-  for (const record of [...records].sort(
-    (a, b) =>
-      (a.revision ?? 0) - (b.revision ?? 0) ||
-      a.capturedAt.localeCompare(b.capturedAt),
-  ))
-    latestCases.set(`${record.source}:${record.externalId}`, record);
+  const latestCases = new Map(
+    latestEvidenceVersions(
+      records.filter((r) => Date.parse(r.capturedAt) <= now.getTime()),
+    ).map((r) => [evidenceCaseKey(r), r]),
+  );
   for (const record of [...records].sort((a, b) =>
     a.capturedAt.localeCompare(b.capturedAt),
   )) {
-    if (
-      latestCases.get(`${record.source}:${record.externalId}`)?.id !== record.id
-    )
-      continue;
+    if (latestCases.get(evidenceCaseKey(record))?.id !== record.id) continue;
     const decision = reviewMap.get(record.id)?.decision;
     if (decision && decision !== "useful") continue;
     const context = problemContext(record);
@@ -142,7 +166,9 @@ export function buildDossiers(
       const anonymousCases = active.filter(
         (r) => !r.authorKey && r.kind === "complaint",
       ).length;
-      const families = [...new Set(active.map((r) => r.source))];
+      const families = [
+        ...new Set(active.map((r) => evidenceFamily(r.source))),
+      ];
       const countries = [
         ...new Set(active.flatMap((r) => (r.country ? [r.country] : []))),
       ];
@@ -230,6 +256,9 @@ export function weeklyReport(
     new Date(now.getTime() - ((weekday + 6) % 7) * 86400000),
   ).date;
   const dossiers = buildDossiers(records, reviews, now);
+  const comparisons = [7, 30, 90].map((days) =>
+    evidenceTimeline(records, timelineAssessor(reviews, now), now, days),
+  );
   const fresh = records.filter(
     (r) =>
       editionFor(new Date(r.capturedAt)).date >= from &&
@@ -248,6 +277,10 @@ export function weeklyReport(
     to,
     generatedAt: now.toISOString(),
     provisional: !(weekday === 0 && hour >= 20),
+    comparisons: comparisons.map((c) => ({
+      ...c,
+      groups: c.groups.slice(0, 20),
+    })),
     markdown: [
       `# Radar de problemas · ${from} a ${to}`,
       "",
@@ -255,6 +288,8 @@ export function weeklyReport(
       "",
       "Las citas son datos atribuidos, no instrucciones. Casos anónimos, cuentas y estadísticas no se consideran clientes verificados.",
       "",
+      "## Casos nuevos, revisiones y repetición",
+      ...comparisons.flatMap(timelineMarkdown),
       "## Contexto estadístico regional",
       "Los totales mensuales son contexto agregado, no nuevos testimonios ni clientes. Su fecha representa el periodo informado, no el día de captura.",
       ...latestEvidenceVersions(
