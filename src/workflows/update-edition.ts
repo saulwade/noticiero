@@ -14,6 +14,13 @@ export async function updateEdition(id: string) {
   } catch {
     await failStep(id);
   }
+  await businessNewsStep();
+}
+async function businessNewsStep() {
+  "use step";
+  const { collectBusinessNewsSafely } =
+    await import("@/features/business-news/service");
+  await collectBusinessNewsSafely();
 }
 async function collectStep(id: string) {
   "use step";

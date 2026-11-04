@@ -20,29 +20,43 @@ const snapshot = (): BackupSnapshot => ({
   tables: Object.keys(backupColumns).map((name) => ({
     name,
     rows:
-      name === "saved_items"
-        ? [{ id: "a", data: { id: "a", note: "Nota privada" } }]
-        : name === "interviews"
-          ? [
-              {
-                id: "i",
-                data: { alias: "Persona A", notes: "Contradicción importante" },
+      name === "business_news"
+        ? [
+            {
+              id: "revision-public",
+              data: {
+                id: "article-public",
+                archiveSequence: 1,
+                title: "Noticia pública",
               },
-            ]
-          : name === "finance_sync"
+            },
+          ]
+        : name === "saved_items"
+          ? [{ id: "a", data: { id: "a", note: "Nota privada" } }]
+          : name === "interviews"
             ? [
                 {
-                  id: "fx:USD/MXN",
+                  id: "i",
                   data: {
-                    id: "fx:USD/MXN",
-                    status: "ok",
-                    asOf: "2026-10-29",
-                    value: "20",
-                    provider: "Frankfurter",
+                    alias: "Persona A",
+                    notes: "Contradicción importante",
                   },
                 },
               ]
-            : [],
+            : name === "finance_sync"
+              ? [
+                  {
+                    id: "fx:USD/MXN",
+                    data: {
+                      id: "fx:USD/MXN",
+                      status: "ok",
+                      asOf: "2026-10-29",
+                      value: "20",
+                      provider: "Frankfurter",
+                    },
+                  },
+                ]
+              : [],
   })),
 });
 describe("respaldo independiente cifrado", () => {
@@ -54,12 +68,15 @@ describe("respaldo independiente cifrado", () => {
       "finance_analyses",
     ]);
     const old = snapshot();
-    old.tables = old.tables.filter((t) => !automatic.has(t.name));
+    old.tables = old.tables.filter(
+      (t) => !automatic.has(t.name) && !t.name.startsWith("business_news"),
+    );
     expect(old.tables).toHaveLength(37);
     expect(() => validateSnapshot(old)).not.toThrow();
     const mixed = snapshot();
     mixed.tables = mixed.tables.filter(
       (t) =>
+        !t.name.startsWith("business_news") &&
         ![
           "finance_profiles",
           "finance_histories",
@@ -68,6 +85,18 @@ describe("respaldo independiente cifrado", () => {
         ].includes(t.name),
     );
     expect(() => validateSnapshot(mixed)).toThrow();
+  });
+  it("acepta 41 tablas completas previas y conserva el nuevo archivo en 43", () => {
+    const old = snapshot();
+    old.tables = old.tables.filter((t) => !t.name.startsWith("business_news"));
+    expect(old.tables).toHaveLength(41);
+    expect(() => validateSnapshot(old)).not.toThrow();
+    const mixed = snapshot();
+    mixed.tables = mixed.tables.filter(
+      (t) => !["business_news", "finance_profiles"].includes(t.name),
+    );
+    expect(() => validateSnapshot(mixed)).toThrow();
+    expect(snapshot().tables).toHaveLength(43);
   });
   it("cubre todas las tablas de contenido y excluye las credenciales y leases", () => {
     const tables = migrations
@@ -99,6 +128,13 @@ describe("respaldo independiente cifrado", () => {
         "SELECT data FROM interviews",
       );
       expect(result.rows[0].data.notes).toBe("Contradicción importante");
+      const news = await db.query<{
+        data: { archiveSequence: number; title: string };
+      }>("SELECT data FROM business_news");
+      expect(news.rows[0].data).toMatchObject({
+        archiveSequence: 1,
+        title: "Noticia pública",
+      });
       const financial = await db.query<{ data: { value: string } }>(
         "SELECT data FROM finance_sync",
       );

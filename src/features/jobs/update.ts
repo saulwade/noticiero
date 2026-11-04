@@ -372,4 +372,7 @@ export async function runLocalUpdate(id: string) {
   } catch {
     await failUpdate(id);
   }
+  const { collectBusinessNewsSafely } =
+    await import("@/features/business-news/service");
+  await collectBusinessNewsSafely();
 }

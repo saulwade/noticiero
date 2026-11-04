@@ -218,10 +218,12 @@ describe("archivo financiero independiente y auditable", () => {
     expect(view.summary.valueMxn).toBe("1000");
   });
   it("acepta respaldos anteriores completos22/26 33/34, nunca parciales", () => {
-    const tables = Object.keys(backupColumns).map((name) => ({
-      name,
-      rows: [],
-    }));
+    const tables = Object.keys(backupColumns)
+      .filter((name) => !name.startsWith("business_news"))
+      .map((name) => ({
+        name,
+        rows: [],
+      }));
     const automatic = new Set([
       "finance_profiles",
       "finance_histories",

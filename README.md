@@ -222,3 +222,8 @@ El workflow privado diario mantiene el respaldo de Actions (7 días) y añade un
 Recuperación privada: localizar la release mensual y descargar el `.enc`; verificar SHA-256 del nombre/manifiesto y ejecutar `scripts/restore-backup.ts` con la clave de recuperación en el entorno y **una carpeta temporal nueva**. La herramienta rechaza bases no vacías. Cada copia es un snapshot completo, incluidas noticias, observaciones, palabras clave, señales, cuadernos, reportes y guardados. Se puede consultar el JSON descifrado o la base aislada para análisis históricos. Nunca restaurar sobre producción para consultar un archivo.
 
 El archivo es una copia adicional y no libera espacio en Neon: el historial sigue también en la base. GitHub/Neon conservan sus propios límites y condiciones; no se promete capacidad infinita. No se contrató ningún servicio, cambió el plan ni se modificó el portafolio.
+
+
+## Noticias empresariales para Mexico Radar
+
+Módulo adicional aislado: RSS públicos de El Economista, Expansión y Marketing4eCommerce México, con archivo de revisiones propio y exportación de metadatos. Se ejecuta después del ciclo existente, sin alimentar la cartera, las oportunidades o la UI actual. Sin servicios nuevos de pago. El endpoint requiere sesión del propietario o NEWS_EXPORT_SECRET exclusivo; nunca comparte el dashboard ni credenciales de base de datos. Contrato, filtros, límites, restricciones y campos: [docs/mexico-radar-news-api.md](docs/mexico-radar-news-api.md).

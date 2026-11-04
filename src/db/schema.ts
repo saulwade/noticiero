@@ -51,6 +51,19 @@ import type {
   CompanyResearch,
   FinanceSyncState,
 } from "@/features/finance/types";
+import type {
+  ArchivedBusinessNews,
+  BusinessSourceState,
+} from "@/features/business-news/types";
+
+export const businessNews = pgTable("business_news", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<ArchivedBusinessNews>().notNull(),
+});
+export const businessNewsSources = pgTable("business_news_sources", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<BusinessSourceState>().notNull(),
+});
 
 export const financeProfiles = pgTable("finance_profiles", {
   id: text("id").primaryKey(),
@@ -226,6 +239,8 @@ export const backupRuns = pgTable("backup_runs", {
 
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
+  `CREATE TABLE IF NOT EXISTS business_news (id text PRIMARY KEY, data jsonb NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS business_news_sources (id text PRIMARY KEY, data jsonb NOT NULL)`,
   ...[
     "finance_profiles",
     "finance_histories",
