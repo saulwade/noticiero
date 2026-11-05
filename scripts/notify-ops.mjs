@@ -1,5 +1,5 @@
 import { operationMessage } from "./lib/ops-messages.mjs";
-import { monitorFailed } from "./lib/monitor-result.mjs";
+import { monitorFailed, monitorScope } from "./lib/monitor-result.mjs";
 const origin = "https://noticiero-self.vercel.app";
 const repository = process.env.GITHUB_REPOSITORY;
 if (!repository || !/^saulwade\/noticiero-ops$/.test(repository))
@@ -87,6 +87,7 @@ try {
         transportFailed,
         backupFailed: process.env.BACKUP_STATUS === "failed",
         testAlert: process.env.OPS_TEST_ALERT === "true",
+        scope: monitorScope(process.env.GITHUB_JOB),
       })
     ) {
       console.error(
@@ -95,7 +96,7 @@ try {
       process.exitCode = 1;
     } else {
       console.warn(
-        "::warning::Hay una fuente con actualización pendiente. La incidencia privada sigue abierta; el monitor completó la comprobación.",
+        "::warning::La comprobación terminó con fuentes pendientes. La incidencia privada conserva su gravedad; este aviso no cambia el resultado de un respaldo o cálculo completado.",
       );
     }
   } else {

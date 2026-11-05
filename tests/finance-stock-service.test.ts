@@ -71,19 +71,17 @@ describe("preparación automática acotada de acciones", () => {
   it("reintenta un error del parser anterior una vez y conserva el enfriamiento en el nuevo", async () => {
     const db = await getDb(),
       source = providers();
-    await db
-      .insert(t.financeSync)
-      .values({
+    await db.insert(t.financeSync).values({
+      id: "stock-history:ETN",
+      data: {
         id: "stock-history:ETN",
-        data: {
-          id: "stock-history:ETN",
-          label: "Historia",
-          provider: "Fixture",
-          status: "error",
-          message: "Error previo",
-          lastAttempt: now.toISOString(),
-        },
-      });
+        label: "Historia",
+        provider: "Fixture",
+        status: "error",
+        message: "Error previo",
+        lastAttempt: now.toISOString(),
+      },
+    });
     vi.mocked(source.history).mockRejectedValue(new Error("still unavailable"));
     const events = [event("Eaton expands data center power infrastructure")];
     await prepareStockContext(events, now, source);
@@ -92,7 +90,7 @@ describe("preparación automática acotada de acciones", () => {
     const state = (await db.select().from(t.financeSync)).find(
       (r) => r.id === "stock-history:ETN",
     )?.data;
-    expect(state?.sourceVersion).toBe("closed-session-v2");
+    expect(state?.sourceVersion).toBe("closed-session-v3-retry");
     expect(state?.status).toBe("error");
   });
   it("cuota agotada deja datos pendientes hasta el siguiente día UTC sin falsa avería", async () => {

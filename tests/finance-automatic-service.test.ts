@@ -187,6 +187,90 @@ function newsFixture(
 }
 
 describe("preparación y archivo automático sin registrar inversiones", () => {
+  it("recupera FX pendiente desde el trabajador y reconcilia el estado real sin tocar movimientos", async () => {
+    await seed();
+    const db = await getDb();
+    await db.insert(t.financeSync).values({
+      id: "fx:USD/MXN",
+      data: {
+        id: "fx:USD/MXN",
+        label: "FX",
+        provider: "Frankfurter",
+        status: "error",
+        lastAttempt: "2026-10-31T00:00:00Z",
+        message: "fallo anterior",
+      },
+    });
+    await db.insert(t.financeMarks).values({
+      id: "prior-fx",
+      data: {
+        id: "prior-fx",
+        kind: "fx",
+        value: "18",
+        asOf: "2026-10-30",
+        capturedAt: "2026-11-01T11:59:00Z",
+        source: "Referencia previa",
+        sourceUrl: "https://example.com/fx",
+      },
+    });
+    const source = providers();
+    await prepareAutomationInput(now, source);
+    const fx = (await db.select().from(t.financeSync)).find(
+      (r) => r.id === "fx:USD/MXN",
+    )?.data;
+    expect(fx).toMatchObject({
+      status: "ok",
+      asOf: "2026-10-30",
+      lastSuccess: now.toISOString(),
+    });
+    expect(source.fx).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(t.financeMovements)).toEqual([]);
+  });
+  it("un fallo de red no convierte FX pendiente en estado sano", async () => {
+    await seed();
+    const db = await getDb();
+    await db.insert(t.financeSync).values({
+      id: "fx:USD/MXN",
+      data: {
+        id: "fx:USD/MXN",
+        label: "FX",
+        provider: "Frankfurter",
+        status: "error",
+        lastAttempt: "2026-10-31T00:00:00Z",
+        message: "fallo anterior",
+      },
+    });
+    const source = providers();
+    vi.mocked(source.fx).mockRejectedValue(new Error("private-provider-body"));
+    await prepareAutomationInput(now, source);
+    expect(
+      (await db.select().from(t.financeSync)).find((r) => r.id === "fx:USD/MXN")
+        ?.data.status,
+    ).toBe("error");
+    expect(await db.select().from(t.financeMarks)).toEqual([]);
+  });
+  it("no se apropia de una consulta diaria de FX en curso", async () => {
+    await seed();
+    const db = await getDb();
+    await db.insert(t.financeSync).values({
+      id: "fx:USD/MXN",
+      data: {
+        id: "fx:USD/MXN",
+        label: "FX",
+        provider: "Frankfurter",
+        status: "running",
+        leaseToken: "daily-owner",
+        leaseUntil: "2026-11-01T13:00:00Z",
+        message: "consultando",
+      },
+    });
+    await prepareAutomationInput(now, providers());
+    expect(
+      (await db.select().from(t.financeSync)).find((r) => r.id === "fx:USD/MXN")
+        ?.data,
+    ).toMatchObject({ status: "running", leaseToken: "daily-owner" });
+  });
+
   it("una etiqueta macro antigua no convierte un trámite bancario en un cambio de tasas", () => {
     expect(
       selectAutomationNews(
@@ -436,7 +520,9 @@ describe("preparación y archivo automático sin registrar inversiones", () => {
       "https://provider.test?apikey=secret-private-key",
       next,
     );
-    const state = (await (await getDb()).select().from(t.financeSync))[0]?.data;
+    const state = (await (await getDb()).select().from(t.financeSync)).find(
+      (r) => r.id === "automatic-analysis",
+    )!.data;
     expect(state.status).toBe("error");
     expect(JSON.stringify(state)).not.toContain("secret-private-key");
   });
@@ -510,12 +596,16 @@ describe("preparación y archivo automático sin registrar inversiones", () => {
       publishAutomationReport(cashReport(first), later, "attempt-a"),
     ).rejects.toThrow();
     const db = await getDb();
-    let state = (await db.select().from(t.financeSync))[0].data;
+    let state = (await db.select().from(t.financeSync)).find(
+      (r) => r.id === "automatic-analysis",
+    )!.data;
     expect(state.status).toBe("running");
     expect(state.leaseToken).toBe("attempt-b");
     await publishAutomationReport(cashReport(second), later, "attempt-b");
     await recordAutomationFailure("late failure", later, "attempt-b");
-    state = (await db.select().from(t.financeSync))[0].data;
+    state = (await db.select().from(t.financeSync)).find(
+      (r) => r.id === "automatic-analysis",
+    )!.data;
     expect(state.status).toBe("ok");
   });
   it("un reintento idempotente termina únicamente su propio turno", async () => {
@@ -532,7 +622,11 @@ describe("preparación y archivo automático sin registrar inversiones", () => {
     ).rejects.toThrow();
     await publishAutomationReport(report, later, "attempt-b");
     const db = await getDb();
-    expect((await db.select().from(t.financeSync))[0].data.status).toBe("ok");
+    expect(
+      (await db.select().from(t.financeSync)).find(
+        (r) => r.id === "automatic-analysis",
+      )!.data.status,
+    ).toBe("ok");
     expect(await db.select().from(t.financeAnalyses)).toHaveLength(1);
   });
   it("los escenarios conservan capital y retorno en su valor final", async () => {

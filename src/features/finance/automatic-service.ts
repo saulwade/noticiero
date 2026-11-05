@@ -334,10 +334,20 @@ export async function prepareAutomationInput(
     const warnings: string[] = [];
     let current = await ledger(db, now);
     let fx: FinanceMark | undefined = current.fx;
+    const fxState = (
+      await db
+        .select()
+        .from(financeSync)
+        .where(eq(financeSync.id, "fx:USD/MXN"))
+    )[0]?.data;
+    const retryDailyFx =
+      fxState?.status === "error" &&
+      now.getTime() - Date.parse(fxState.lastAttempt ?? "") >= 6 * 3600000;
     if (
       !fx ||
       fx.asOf < expectedUsClose(now) ||
-      now.getTime() - Date.parse(fx.capturedAt) > 7 * DAY
+      now.getTime() - Date.parse(fx.capturedAt) > 7 * DAY ||
+      retryDailyFx
     ) {
       try {
         const ref = await providers.fx(now);
@@ -358,6 +368,44 @@ export async function prepareAutomationInput(
             .insert(financeMarks)
             .values({ id: mark.id, data: mark })
             .onConflictDoNothing();
+          const prior = (
+            await tx
+              .select()
+              .from(financeSync)
+              .where(eq(financeSync.id, "fx:USD/MXN"))
+          )[0]?.data;
+          const active =
+            prior?.status === "running" &&
+            Date.parse(prior.leaseUntil ?? "") > now.getTime();
+          if (
+            !active &&
+            (!prior?.lastAttempt || prior.lastAttempt <= now.toISOString()) &&
+            (!prior?.asOf || prior.asOf <= ref.asOf)
+          ) {
+            const state: FinanceSyncState = {
+              ...prior,
+              id: "fx:USD/MXN",
+              label: "USD/MXN",
+              provider: "Frankfurter",
+              status: "ok",
+              message:
+                "Referencia diaria confirmada durante el análisis automático; no es precio de ejecución.",
+              session: financeDay(now),
+              asOf: ref.asOf,
+              value: ref.value,
+              lastAttempt: now.toISOString(),
+              lastSuccess: now.toISOString(),
+              leaseToken: undefined,
+              leaseUntil: undefined,
+            };
+            await tx
+              .insert(financeSync)
+              .values({ id: state.id, data: state })
+              .onConflictDoUpdate({
+                target: financeSync.id,
+                set: { data: state },
+              });
+          }
           await assertFinanceCapacity(tx);
         });
         fx = mark;

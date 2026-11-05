@@ -15,6 +15,21 @@ export const PROFECO_TELECOM_RESOURCE = "fd854822-65a6-47d1-86f9-5b406b72dd6d";
 export const PROFECO_TELECOM_CATALOG = `https://www.datos.gob.mx/dataset/quejas_materia_telecomunicaciones/resource/${PROFECO_TELECOM_RESOURCE}`;
 export const COLOMBIA_CATALOG = "https://www.datos.gov.co/d/xyy7-rn7p";
 const CAP = 20;
+async function colombiaJson(url: URL, now: Date, fetcher: typeof fetch) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await publicJson(url, now, fetcher, 30000);
+    } catch (error) {
+      const transient =
+        error instanceof Error &&
+        (/^HTTP 5\d\d$/.test(error.message) ||
+          ["TypeError", "TimeoutError", "AbortError"].includes(error.name));
+      if (!transient || attempt === 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  throw new Error("Consulta pública no disponible.");
+}
 const value = z.string().min(1).max(3000);
 const profecoSchema = z.object({
   success: z.literal(true),
@@ -259,22 +274,21 @@ export async function collectColombia(
     const today = editionFor(now).date,
       [year, month] = today.split("-").map(Number);
     const url = new URL("https://www.datos.gov.co/resource/xyy7-rn7p.json");
-    // LIMIT is applied after GROUP BY by Socrata: discover one recent period
-    // first instead of aggregating two full years before limiting the result.
+    // A scalar MAX avoids globally sorting millions of complaint rows just to find one period.
     url.search = new URLSearchParams({
-      $select: "a_o_creacion,mes_creacion",
-      $where: `a_o_creacion >= ${year - 1} AND (a_o_creacion < ${year} OR mes_creacion <= ${month})`,
-      $order: "a_o_creacion DESC,mes_creacion DESC",
-      $limit: "1",
+      $select: "max(a_o_creacion*100+mes_creacion) as periodo",
+      $where: `a_o_creacion >= ${year - 1} AND (a_o_creacion < ${year} OR (a_o_creacion = ${year} AND mes_creacion <= ${month})) AND mes_creacion >= 1 AND mes_creacion <= 12`,
     }).toString();
     const periodRows = z
-      .array(z.object({ a_o_creacion: value, mes_creacion: value }))
+      .array(z.object({ periodo: value }))
       .max(1)
-      .parse(await publicJson(url, now, fetcher, 30_000));
+      .parse(await colombiaJson(url, now, fetcher));
     const latest = periodRows[0];
     if (!latest) throw new Error("No hay un periodo publicado verificable.");
-    const latestYear = Number(latest.a_o_creacion),
-      latestMonth = Number(latest.mes_creacion);
+    if (!/^\d{6}$/.test(latest.periodo))
+      throw new Error("Periodo agregado inválido.");
+    const latestYear = Number(latest.periodo.slice(0, 4)),
+      latestMonth = Number(latest.periodo.slice(4));
     if (
       !Number.isInteger(latestYear) ||
       latestYear < year - 1 ||
@@ -314,9 +328,7 @@ export async function collectColombia(
       $limit: String(CAP),
       $offset: String(offset),
     }).toString();
-    const data = colombiaSchema.parse(
-      await publicJson(url, now, fetcher, 30_000),
-    );
+    const data = colombiaSchema.parse(await colombiaJson(url, now, fetcher));
     const records: EvidenceRecord[] = [];
     for (const row of data) {
       const y = Number(row.a_o_creacion),

@@ -13,6 +13,7 @@ import type {
   AutomationReference,
 } from "./automatic-types";
 import { researchIssuers } from "./stock-catalog";
+import { freeFxJson } from "./free-fx";
 
 export const AUTOMATION_ASSETS: AutomationAsset[] = [
   {
@@ -40,7 +41,7 @@ export const AUTOMATION_ASSETS: AutomationAsset[] = [
   },
 ];
 export const AUTOMATION_MAX_PROVIDER_BYTES = 8_000_000;
-export const WEEKLY_HISTORY_VERSION = "closed-session-v2";
+export const WEEKLY_HISTORY_VERSION = "closed-session-v3-retry";
 const DAY = 86_400_000;
 type Options = {
   fetcher?: typeof fetch;
@@ -226,7 +227,11 @@ export async function fetchWeeklyHistory(
       to,
     }).toString();
     const rates = parseHistoricalFx(
-      await boundedJson(fxUrl, options.fetcher ?? fetch),
+      await freeFxJson(
+        fxUrl,
+        options.fetcher ?? fetch,
+        AUTOMATION_MAX_PROVIDER_BYTES,
+      ),
       from,
       to,
     );

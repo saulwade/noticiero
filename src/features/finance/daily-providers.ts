@@ -8,6 +8,7 @@ import {
 } from "./market-calendar";
 import type { Instrument } from "./types";
 import type { Quote } from "@/lib/types";
+import { freeFxJson, FreeFxError } from "./free-fx";
 
 export type DailyReference = {
   value: string;
@@ -169,7 +170,17 @@ export async function fetchDailyFx(
   const url = new URL("https://api.frankfurter.dev/v2/rate/USD/MXN");
   url.searchParams.set("date", day);
   try {
-    const body = record(await boundedJson(url, fetcher));
+    let raw: unknown;
+    try {
+      raw = await freeFxJson(url, fetcher);
+    } catch (error) {
+      // Some publication dates are not available yet. Fetch a real latest observation,
+      // retaining its actual date and the same validation; never substitute today's date.
+      if (!(error instanceof FreeFxError) || error.status !== 404) throw error;
+      url.searchParams.delete("date");
+      raw = await freeFxJson(url, fetcher);
+    }
+    const body = record(raw);
     if (
       body.base !== "USD" ||
       body.quote !== "MXN" ||

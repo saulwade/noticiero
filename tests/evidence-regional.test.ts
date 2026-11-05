@@ -289,10 +289,22 @@ describe("fuentes oficiales regionales acotadas", () => {
   it("Colombia conserva cantidades mensuales como estadísticas, nunca personas", async () => {
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockImplementation(async () => json([total]));
+      .mockImplementation(async (input) =>
+        json(
+          new URL(String(input)).searchParams.has("$group")
+            ? [total]
+            : [{ periodo: "202609" }],
+        ),
+      );
     const batch = await collectColombia(undefined, now, fetcher);
     const discovery = new URL(String(fetcher.mock.calls[0][0]));
-    expect(discovery.searchParams.get("$limit")).toBe("1");
+    expect(discovery.searchParams.get("$select")).toBe(
+      "max(a_o_creacion*100+mes_creacion) as periodo",
+    );
+    expect(discovery.searchParams.has("$order")).toBe(false);
+    expect(discovery.searchParams.get("$where")).toContain(
+      "a_o_creacion = 2026 AND mes_creacion <= 11",
+    );
     expect(discovery.searchParams.has("$group")).toBe(false);
     const url = new URL(String(fetcher.mock.calls[1][0]));
     expect(url.origin).toBe("https://www.datos.gov.co");
@@ -310,6 +322,17 @@ describe("fuentes oficiales regionales acotadas", () => {
     expect(buildDossiers(batch.records, [], now)).toEqual([]);
     expect(batch.records[0].authorKey).toBeUndefined();
     expect(batch.state.message).toContain("no testimonios");
+  });
+  it("reintenta una falla transitoria sin saltarse cuotas ni crear testimonios", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(json([{ periodo: "202609" }]))
+      .mockResolvedValueOnce(json([total]));
+    const batch = await collectColombia(undefined, now, fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(batch.records[0]?.kind).toBe("statistic");
+    expect(batch.state.status).toBe("limited");
   });
   it("rechaza meses, totales y fechas imposibles sin crear estadísticas", async () => {
     const batch = await collectColombia(
@@ -329,9 +352,7 @@ describe("fuentes oficiales regionales acotadas", () => {
   it("descubre el año anterior cuando el nuevo aún no tiene publicación y respeta 429", async () => {
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        json([{ a_o_creacion: "2026", mes_creacion: "12" }]),
-      )
+      .mockResolvedValueOnce(json([{ periodo: "202612" }]))
       .mockResolvedValueOnce(json([{ ...total, mes_creacion: "12" }]));
     const batch = await collectColombia(
       undefined,
@@ -359,7 +380,7 @@ describe("fuentes oficiales regionales acotadas", () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const u = new URL(String(input));
       if (!u.searchParams.has("$group"))
-        return json([{ a_o_creacion: "2026", mes_creacion: month }]);
+        return json([{ periodo: `2026${month.padStart(2, "0")}` }]);
       offsets.push(u.searchParams.get("$offset")!);
       return json(
         Array.from({ length: 20 }, (_, i) => ({
