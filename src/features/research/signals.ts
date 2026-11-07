@@ -8,6 +8,7 @@ import {
   isHypothetical,
   isRecruitment,
   operationalFailure,
+  describesPastWorkaround,
 } from "./content-quality";
 
 const request =
@@ -19,7 +20,7 @@ const workaround =
 const personal =
   /\b(i|we|my|our|anyone|yo|nosotros|mi|nuestro|nuestra|alguien|busco|necesito|me|no puedo)\b/i;
 const processContext =
-  /\b(tool\w*|apps?|applications?|software|platform\w*|service\w*|account\w*|login|export\w*|import\w*|data|database\w*|code|coding|developer\w*|apis?|ai|llm\w*|agents?|tokens?|quota\w*|usage|invoice\w*|billing|payment\w*|bank\w*|credit|loan\w*|lending|insurance|payroll|bookkeeping|accounting|inventory|logistics|compliance|budget\w*|cost\w*|pricing|spreadsheet\w*|record\w*|document\w*|file\w*|workflow\w*|automat\w*|integrat\w*|reconcil\w*|transcri\w*|meeting\w*|security|herramienta\w*|cuenta\w*|factura\w*|pago\w*|costo\w*|precio\w*|archivo\w*|proceso\w*|reunion\w*)\b/i;
+  /\b(tool\w*|apps?|applications?|software|platform\w*|service\w*|account\w*|login|export\w*|import\w*|data|database\w*|code|coding|developer\w*|apis?|ai|llm\w*|agents?|tokens?|quota\w*|usage|invoice\w*|billing|payment\w*|bank\w*|credit|loan\w*|lending|insurance|payroll|bookkeeping|accounting|inventory|logistics|compliance|budget\w*|cost\w*|pricing|spreadsheet\w*|record\w*|document\w*|file\w*|workflow\w*|automat\w*|integrat\w*|reconcil\w*|transcri\w*|meeting\w*|security|herramienta\w*|cuenta\w*|factura\w*|pago\w*|costo\w*|precio\w*|archivo\w*|proceso\w*|reunion\w*|cfdi|sat|descarg\w*)\b/i;
 const firstPersonBlock = /\b(?:i|we) (?:can['’]t|cannot)\b|\bno puedo\b/i;
 export function classifySignal(
   sentence: string,
@@ -29,6 +30,11 @@ export function classifySignal(
     isRecruitment(sentence) ||
     isHypothetical(sentence) ||
     isEditorialReflection(sentence) ||
+    describesPastWorkaround(sentence) ||
+    /^you receive a response\b/.test(sentence) ||
+    /\b(?:as mentioned by my colleague|you are contacting us from an email address)\b/.test(
+      sentence,
+    ) ||
     (!problemScope(sentence) && !operationalFailure.test(sentence)) ||
     isSpeculation(sentence) ||
     !personal.test(sentence) ||

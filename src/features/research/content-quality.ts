@@ -18,8 +18,30 @@ export function isHypothetical(value: string) {
   );
 }
 export function isEditorialReflection(value: string) {
-  return /\b(?:i loved coding|used to enjoy coding)\b[\s\S]{0,180}\b(?:reason|purpose|necessary)\b/i.test(
+  return /\b(?:i loved coding|used to enjoy coding)\b[\s\S]{0,180}\b(?:reason|purpose|necessary)\b|\bi am optimistic\b[\s\S]{0,180}\bif\b/i.test(
     value,
+  );
+}
+
+/** A former manual task is useful context, not an assertion of current pain. */
+export function describesPastWorkaround(value: string) {
+  const text = normalizedText(value);
+  const parts = text.split(
+    /(?<=[.!?])\s+|\b(?:but now|now|pero ahora|ahora)\b/,
+  );
+  const past =
+    /\b(?:before i had to|previously (?:i|we) (?:had to|used to)|antes (?:tenia|teniamos) que)\b/;
+  return (
+    past.test(text) &&
+    !/\b(?:still|again|todavia|aun|sigo|seguimos)\b/.test(text) &&
+    !parts.some(
+      (part) =>
+        !past.test(part) &&
+        (operationalFailure.test(part) ||
+          /\b(?:i|we) (?:need|want)|\b(?:necesito|necesitamos|busco)\b/.test(
+            part,
+          )),
+    )
   );
 }
 export function reportsResolution(value: string) {
@@ -52,4 +74,4 @@ export function reportsResolution(value: string) {
     });
 }
 export const operationalFailure =
-  /\b(?:cannot|can['’]t|unable|blocked|fails?|failed|failure|broken|crash\w*|freez\w*|error|incorrect|inaccurate|401|403|pgrst303|silently (?:drop\w*|fail\w*|remov\w*)|(?:does|did)(?:n['’]t| not)[\s\S]{0,35}(?:work\w*|load\w*|upload\w*|download\w*|line up|select\w*)|not[\s\S]{0,20}(?:upload\w*|download\w*|translat\w*|detect\w*|receiv\w*)|(?:encountering|having|have) (?:a|one|the) problem|deletes? (?:the rest|part|all)|glitch\w*|laggy|jitter\w*|resets? to|too (?:long|slow)|lack.{0,25}(?:detail|information)|missing|mismatch|reject\w*|denied|spills?|black frame|no funciona|no puedo|fall[ao]\w*|no (?:carga|sincroniza|recibo|permite)|negativa|incumpl\w*)\b/i;
+  /\b(?:cannot|can['’]t|unable|blocked|fails?|failed|failure|broken|corrupt\w*|overwrit\w*|sobrescrib\w*|rechaz\w*|(?:basep|importep).{0,70}por debajo|status.{0,80}(?:same as old|not updated|stale)|crash\w*|freez\w*|error|incorrect|inaccurate|401|403|pgrst303|silently (?:drop\w*|fail\w*|remov\w*)|(?:does|did)(?:n['’]t| not)[\s\S]{0,35}(?:work\w*|load\w*|upload\w*|download\w*|line up|select\w*)|not[\s\S]{0,20}(?:upload\w*|download\w*|translat\w*|detect\w*|receiv\w*)|(?:encountering|having|have) (?:a|one|the) problem|deletes? (?:the rest|part|all)|glitch\w*|laggy|jitter\w*|resets? to|too (?:long|slow)|lack.{0,25}(?:detail|information)|missing|mismatch|reject\w*|denied|spills?|black frame|no funciona|no puedo|fall[ao]\w*|no (?:carga|sincroniza|recibo|permite)|negativa|incumpl\w*)\b/i;

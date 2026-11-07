@@ -27,7 +27,7 @@ const record = (
   url: `https://news.ycombinator.com/item?id=${id}`,
   title: "Account issue",
   quote:
-    "I can't access my account every week and manually export records for 3 hours.",
+    "I can't access my account: JWT validation fails every week and I manually export records for 3 hours.",
   occurredAt: "2026-10-30T15:00:00Z",
   capturedAt: now.toISOString(),
   language: "en",
@@ -105,7 +105,12 @@ describe("evidencia contextual y persistencia", () => {
   });
   it("registra una resolución sin exigir otra queja y sin contarla como demanda", () => {
     const d = buildDossiers(
-      [record("a"), record("b", { quote: "Account access works now." })],
+      [
+        record("a"),
+        record("b", {
+          quote: "Account access works now. JWT validation was fixed.",
+        }),
+      ],
       [],
       now,
     )[0];
@@ -157,7 +162,10 @@ describe("evidencia contextual y persistencia", () => {
     const rs = [
       record("a"),
       record("b", { product: "Another app" }),
-      record("c", { quote: "The account access bug is fixed and works now." }),
+      record("c", {
+        quote:
+          "The account access bug is fixed and works now. JWT validation was fixed.",
+      }),
     ];
     const ds = buildDossiers(rs, [], now);
     expect(ds).toHaveLength(2);

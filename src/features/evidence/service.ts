@@ -10,7 +10,7 @@ import {
 } from "@/db/schema";
 import { hash, safePublicUrl } from "@/features/news/normalize";
 import { buildDossiers, weeklyReport } from "./engine";
-import { collectCfpb, collectGithub } from "./connectors";
+import { collectCfpb, collectGithub, collectGithubMexico } from "./connectors";
 import {
   collectColombia,
   collectProfeco,
@@ -35,6 +35,7 @@ export { MAX_EVIDENCE_RECORDS } from "@/features/storage/capacity";
 const defaults: ConnectorState[] = [
   "hn",
   "github",
+  "github-mx",
   "cfpb",
   "profeco",
   "profeco-telecom",
@@ -287,6 +288,7 @@ export async function refreshEvidence(
   for (const [id, collect] of [
     ["cfpb", collectCfpb],
     ["github", collectGithub],
+    ["github-mx", collectGithubMexico],
     ["profeco", collectProfeco],
     ["profeco-telecom", collectProfecoTelecom],
     ["sfc-co", collectColombia],

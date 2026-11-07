@@ -78,6 +78,10 @@ const aliases: Record<string, string> = {
   reconciliation: "conciliacion",
   compliance: "cumplimiento",
 };
+for (const word of "but after before if full read next now so verge story ve around company year years while yet still only even well much every each another back go going see seen since without because through across according article articles published updated share shares newsletter subscribe subscription click copyright continue reading via source sources www com html nbsp amp dont didnt doesnt cant isnt wasnt thats whats im ive youre theyre its well also upon within whether either both such same own may might must shall take taken told say says said makes made anything everything nothing someone anyone everyone something somewhere really rather least lot lots per currently recently previous following therefore however although though including includes include together already several often thing things will would should could can just get got gets take takes new today yesterday tomorrow last latest week weeks month months daily weekly monthly ayer hoy manana segun dijo dice ademas tambien mientras desde hasta durante entre sobre cada otro otra otros otras mismo misma mismos mismas solo solamente aun tanto tantos todas todo todos ser estar sido esta estan estamos sera serían somos han haber habia habia unos unas del las los una uno un el la de se que para por con sin sus su les le lo me te nos os al es son fue fueron era eran hemos tener tiene tienen hacer hace hizo hecho más mas muy asi así aquí aqui cuando donde quien quienes cual cuales entonces esto eso este esta estos estas nuestro nuestra nuestros nuestras vuestro vuestra hay porque pero sino ni ya si sí qué cómo".split(
+  /\s+/,
+))
+  stopwords.add(word);
 export function terms(text: string): string[] {
   const words =
     text

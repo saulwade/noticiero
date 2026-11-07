@@ -1,5 +1,11 @@
 export type EvidenceSource =
-  "hn" | "github" | "cfpb" | "profeco" | "profeco-telecom" | "sfc-co";
+  | "hn"
+  | "github"
+  | "github-mx"
+  | "cfpb"
+  | "profeco"
+  | "profeco-telecom"
+  | "sfc-co";
 export type EvidenceRecord = {
   revision?: number;
   id: string;

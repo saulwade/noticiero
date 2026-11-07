@@ -1,4 +1,5 @@
 import { normalizedText, rolePattern } from "./evidence-text";
+import { operationalFailure } from "./content-quality";
 
 export type ProblemScope = {
   key: string;
@@ -11,6 +12,17 @@ export type ProblemScope = {
 };
 /** These generic words preserve an observation but cannot establish a shared job. */
 export function isSpecificScope(scope: ProblemScope) {
+  if (
+    [
+      "security-workflow",
+      "account-access",
+      "data-export",
+      "data-integration",
+    ].includes(scope.task) &&
+    !scope.mechanism &&
+    scope.domain !== "facturacion"
+  )
+    return false;
   return (
     !["support", "manual-work"].includes(scope.task) &&
     !(scope.task === "payments" && scope.domain === "general")
@@ -143,6 +155,54 @@ const tasks: [string, string, RegExp][] = [
 // Mechanisms require explicit text. Co-mentioning a vendor does not establish
 // that two people encountered the same failure or need the same intervention.
 const mechanisms: [string, string, string, RegExp][] = [
+  [
+    "cfdi-rounding",
+    "tax-validation",
+    "Validar redondeos en complementos de pago CFDI",
+    /\bcrp20268\b|\bequivalenciadr\b.{0,120}\bbasep\b|\bbasep\b.{0,120}\bequivalenciadr\b/,
+  ],
+  [
+    "stale-interface-state",
+    "interface-state",
+    "Confirmar cambios de estado sin recargar manualmente",
+    /\bstatus\b.{0,80}\b(?:same as old|not updated|stale)\b/,
+  ],
+  [
+    "credential-deleted",
+    "account-access",
+    "Reparar referencias a credenciales eliminadas",
+    /\bcredential\w*\b.{0,100}\b(?:deleted|does not exist|not found)\b/,
+  ],
+  [
+    "oauth-policy",
+    "account-access",
+    "Corregir permisos de conexión OAuth",
+    /\boauth\w*\b.{0,100}\b(?:policy|policies|allow rule|delegate)\b|\bcredential type policy\b/,
+  ],
+  [
+    "interface-layout",
+    "interface-layout",
+    "Corregir interfaces que se mueven o desbordan",
+    /\b(?:tabs?|navigation|layout|interfaz|barra)\b.{0,100}\b(?:jitter\w*|shake\w*|overflow\w*|tiembla\w*)\b/,
+  ],
+  [
+    "export-encoding",
+    "data-export",
+    "Exportar archivos sin dañar caracteres",
+    /\b(?:csv|export\w*)\b.{0,120}\b(?:encoding|accented characters|wrong charset|codificacion)\b/,
+  ],
+  [
+    "import-overwrite",
+    "data-export",
+    "Importar movimientos sin sobrescribir registros",
+    /\bimport\w*\b.{0,100}\b(?:overwrite\w*|overwrit\w*|sobrescrib\w*)\b/,
+  ],
+  [
+    "sat-download",
+    "data-export",
+    "Recuperar descargas de comprobantes del SAT",
+    /\b(?:descarg\w*|download\w*)\b.{0,80}\b(?:cfdi|sat)\b|\b(?:sat|cfdi)\b.{0,80}\b(?:descarg\w*|download\w*)\b/,
+  ],
   [
     "credential-rotation",
     "account-access",
@@ -289,16 +349,24 @@ export function problemScope(
   segment = "",
 ): ProblemScope | undefined {
   const normalized = normalizedText(text);
-  const mechanismText = normalized
-    .split(/;|\n|\b(?:but|although|even though|however|pero|aunque)\b/)
+  const mechanismClauses = normalized
+    .split(
+      /;|\n|(?<=[.!?])\s+|\b(?:but|although|even though|however|pero|aunque)\b/,
+    )
     .filter(
       (clause) =>
-        !/\b(?:ruled out|not caused by|not due to|unrelated to|not related to|there (?:was|is) no|(?:we|i) (?:do|did) not (?:use|change|rotate)|not using|no password rotation|no credential rotation|no hubo|no usamos|descartamos)\b/.test(
+        !/\b(?:ruled out|not (?:an? )?(?:encoding|credential|oauth|import) (?:issue|problem)|not caused by|not due to|unrelated to|not related to|there (?:was|is) no|(?:we|i) (?:do|did) not (?:use|change|rotate)|not using|no password rotation|no credential rotation|no hubo|no usamos|descartamos)\b/.test(
           clause,
         ),
-    )
-    .join(" ");
-  const mechanism = mechanisms.find((m) => m[3].test(mechanismText));
+    );
+  const failedClauses = mechanismClauses.filter((clause) =>
+    operationalFailure.test(clause),
+  );
+  const mechanism =
+    mechanisms.find((m) => failedClauses.some((clause) => m[3].test(clause))) ??
+    (failedClauses.length
+      ? undefined
+      : mechanisms.find((m) => m[3].test(mechanismClauses.join(" "))));
   if (
     /\b(?:environmental|societal|social|ambiental)\s+cost\w*\b/.test(normalized)
   )

@@ -12,6 +12,11 @@ import { isRelevantStory } from "@/features/news/relevance";
 import { groupStories, rankStories } from "@/features/news/deduplicate";
 import { keywordSummary } from "./keyword-summary";
 import { terms } from "./vector";
+import {
+  buildResearchDigest,
+  researchDigestMarkdown,
+} from "@/features/evidence/research-digest";
+import type { EvidenceRecord, EvidenceReview } from "@/features/evidence/types";
 
 const clean = (text: string) =>
   text
@@ -34,7 +39,14 @@ export function createDailyReport(
   notes: ResearchNote[],
   ideas: Opportunity[],
   now = new Date(),
+  evidence?: { records: EvidenceRecord[]; reviews: EvidenceReview[] },
 ): DailyReport {
+  const cutoff = new Date(
+    Math.min(now.getTime(), Date.parse(`${date}T23:59:59.999-06:00`)),
+  );
+  const researchDigest = evidence
+    ? buildResearchDigest(evidence.records, evidence.reviews, cutoff)
+    : undefined;
   const todaySignals = signals.filter(
     (signal) => editionFor(new Date(signal.detectedAt)).date === date,
   );
@@ -188,6 +200,7 @@ export function createDailyReport(
         "",
       );
   }
+  if (researchDigest) lines.push(...researchDigestMarkdown(researchDigest));
   lines.push("## Hipótesis para validar", "");
   if (!relatedIdeas.length)
     lines.push(
@@ -222,6 +235,7 @@ export function createDailyReport(
   );
   return {
     date,
+    ...(researchDigest ? { researchDigest } : {}),
     news,
     generatedAt: now.toISOString(),
     inputHash: hash(
@@ -237,6 +251,7 @@ export function createDailyReport(
         themes,
         provisional,
         contextKeywords,
+        researchDigest,
       }),
     ),
     provisional,

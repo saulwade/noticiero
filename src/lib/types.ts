@@ -121,6 +121,7 @@ export type ResearchModel = {
   updatedAt: string;
 };
 export type DailyReport = {
+  researchDigest?: import("@/features/evidence/research-digest").ResearchDigest;
   date: string;
   generatedAt: string;
   inputHash: string;

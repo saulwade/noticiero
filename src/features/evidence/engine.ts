@@ -92,8 +92,12 @@ export function problemContext(record: EvidenceRecord) {
     fields.obstacle = { value: record.issue, quote: record.quote };
   return { accepted, correction, topic: scope?.label, fields, scope };
 }
-function groupKey(record: EvidenceRecord, topic: string) {
-  const scope = problemContext(record).scope;
+function groupKey(
+  record: EvidenceRecord,
+  topic: string,
+  context = problemContext(record),
+) {
+  const scope = context.scope;
   const specificity =
     !scope || !isSpecificScope(scope)
       ? `:${record.source}:${record.externalId}`
@@ -105,7 +109,11 @@ export function timelineAssessment(record: EvidenceRecord) {
   if (record.kind === "statistic" || (!context.accepted && !context.correction))
     return;
   const label = context.topic ?? "Problema por clasificar";
-  return { key: groupKey(record, label), label, resolved: context.correction };
+  return {
+    key: groupKey(record, label, context),
+    label,
+    resolved: context.correction,
+  };
 }
 export function timelineAssessor(reviews: EvidenceReview[], now = new Date()) {
   const decisions = new Map(
@@ -125,6 +133,20 @@ export function buildDossiers(
   reviews: EvidenceReview[],
   now = new Date(),
 ): ProblemDossier[] {
+  // Interpretation is pure: reuse it within this snapshot instead of parsing
+  // the same bounded quote for grouping, counts, fields and contradictions.
+  const contexts = new WeakMap<
+    EvidenceRecord,
+    ReturnType<typeof problemContext>
+  >();
+  const contextFor = (record: EvidenceRecord) => {
+    let context = contexts.get(record);
+    if (!context) {
+      context = problemContext(record);
+      contexts.set(record, context);
+    }
+    return context;
+  };
   const reviewMap = new Map(
     reviews
       .filter((r) => Date.parse(r.at) <= now.getTime())
@@ -142,13 +164,17 @@ export function buildDossiers(
     if (latestCases.get(evidenceCaseKey(record))?.id !== record.id) continue;
     const decision = reviewMap.get(record.id)?.decision;
     if (decision && decision !== "useful") continue;
-    const context = problemContext(record);
+    const context = contextFor(record);
     if (
       (!context.accepted && !context.correction && decision !== "useful") ||
       record.kind === "statistic"
     )
       continue;
-    const key = groupKey(record, context.topic ?? "Problema por clasificar");
+    const key = groupKey(
+      record,
+      context.topic ?? "Problema por clasificar",
+      context,
+    );
     const members = groups.get(key) ?? [];
     const sameCase = members.findIndex(
       (r) => r.source === record.source && r.externalId === record.externalId,
@@ -159,7 +185,7 @@ export function buildDossiers(
   }
   return [...groups]
     .map(([key, members]) => {
-      const active = members.filter((r) => !problemContext(r).correction);
+      const active = members.filter((r) => !contextFor(r).correction);
       const authors = new Set(
         active.flatMap((r) => (r.authorKey ? [r.authorKey] : [])),
       );
@@ -174,7 +200,7 @@ export function buildDossiers(
       ];
       const voices = authors.size + anonymousCases;
       const sample = active[0] ?? members[0];
-      const fields = problemContext(sample).fields;
+      const fields = contextFor(sample).fields;
       const status =
         voices >= 2
           ? families.length >= 2
@@ -183,8 +209,8 @@ export function buildDossiers(
           : "isolated";
       return {
         id: `problem-${hash(key)}`,
-        label: problemContext(sample).topic ?? "Problema por clasificar",
-        scope: problemContext(sample).scope,
+        label: contextFor(sample).topic ?? "Problema por clasificar",
+        scope: contextFor(sample).scope,
         status,
         evidenceIds: members.map((r) => r.id),
         countries,
@@ -222,7 +248,7 @@ export function buildDossiers(
           ...new Set(members.flatMap((r) => (r.product ? [r.product] : []))),
         ],
         contradictions: members
-          .filter((r) => problemContext(r).correction)
+          .filter((r) => contextFor(r).correction)
           .map((r) => r.quote),
         mexicoHypothesis: countries.includes("MX")
           ? "Investigar si el mismo obstáculo se repite en un segmento accesible de México; la procedencia local no valida una solución."

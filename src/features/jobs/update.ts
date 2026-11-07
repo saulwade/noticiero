@@ -227,10 +227,10 @@ export async function analyzeNews(
 export async function analyzeIdeas(id: string): Promise<void> {
   const job = await activeJob(id);
   if (analysisMode() === "local") {
-    await runLocalResearch(new Date(job.startedAt), () => activeJob(id));
     await refreshEvidence(await getStories(), new Date(job.startedAt), () =>
       activeJob(id),
     );
+    await runLocalResearch(new Date(job.startedAt), () => activeJob(id));
     return;
   }
   if (!aiConfig().configured) return;

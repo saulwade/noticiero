@@ -10,6 +10,8 @@ import {
   opportunityEvents,
   researchObservations,
   stories as storedStories,
+  evidenceRecords,
+  evidenceReviews,
 } from "@/db/schema";
 import { getStories } from "@/db/repository";
 import type { ResearchData } from "@/lib/types";
@@ -225,10 +227,12 @@ export async function saveDailyReport(
     await db.select().from(dailyReports).where(eq(dailyReports.date, date))
   )[0]?.data;
   if (old && !old.provisional && date < editionFor(now).date) return old;
-  const [stories, research, rows] = await Promise.all([
+  const [stories, research, rows, evidence, reviews] = await Promise.all([
     getStories(),
     getResearchData(),
     db.select().from(opportunities),
+    db.select().from(evidenceRecords),
+    db.select().from(evidenceReviews),
   ]);
   const report = createDailyReport(
     date,
@@ -237,6 +241,10 @@ export async function saveDailyReport(
     research.notes,
     rows.map((row) => row.data),
     now,
+    {
+      records: evidence.map((r) => r.data),
+      reviews: reviews.map((r) => r.data),
+    },
   );
   if (old?.inputHash === report.inputHash) return old;
   await db

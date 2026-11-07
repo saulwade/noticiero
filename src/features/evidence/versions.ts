@@ -1,7 +1,11 @@
 import type { EvidenceRecord } from "./types";
 
 export const evidenceFamily = (source: EvidenceRecord["source"]) =>
-  source === "profeco-telecom" ? "profeco" : source;
+  source === "profeco-telecom"
+    ? "profeco"
+    : source === "github-mx"
+      ? "github"
+      : source;
 export const evidenceCaseKey = (record: EvidenceRecord) =>
   `${evidenceFamily(record.source)}:${record.externalId}`;
 

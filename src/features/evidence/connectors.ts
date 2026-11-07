@@ -20,6 +20,12 @@ export const GITHUB_EVIDENCE_REPOSITORIES = [
   "immich-app/immich",
   "actualbudget/actual",
 ] as const;
+// Mexican fiscal software context is not evidence of the author's nationality.
+export const MEXICO_EVIDENCE_REPOSITORIES = [
+  "phpcfdi/sat-ws-descarga-masiva",
+  "nodecfdi/sat-ws-descarga-masiva",
+  "eclipxe13/CfdiUtils",
+] as const;
 type Fetcher = typeof fetch;
 const date = z.string().refine((value) => {
   if (
@@ -335,14 +341,47 @@ export async function collectGithub(
   now = new Date(),
   fetcher: Fetcher = fetch,
 ): Promise<ConnectorBatch> {
-  const paused = cooldown("github", previous, now);
+  return collectGithubSample(
+    "github",
+    GITHUB_EVIDENCE_REPOSITORIES,
+    previous,
+    now,
+    fetcher,
+  );
+}
+
+export async function collectGithubMexico(
+  previous?: ConnectorState,
+  now = new Date(),
+  fetcher: Fetcher = fetch,
+): Promise<ConnectorBatch> {
+  return collectGithubSample(
+    "github-mx",
+    MEXICO_EVIDENCE_REPOSITORIES,
+    previous,
+    now,
+    fetcher,
+  );
+}
+
+async function collectGithubSample(
+  source: "github" | "github-mx",
+  repositories: readonly string[],
+  previous: ConnectorState | undefined,
+  now: Date,
+  fetcher: Fetcher,
+): Promise<ConnectorBatch> {
+  const paused = cooldown(source, previous, now);
   if (paused) return paused;
   try {
     const since =
-      cursor(previous).since ?? new Date(now.getTime() - 7 * DAY).toISOString();
+      cursor(previous).since ??
+      new Date(
+        now.getTime() - (source === "github-mx" ? 30 : 7) * DAY,
+      ).toISOString();
     const url = new URL("https://api.github.com/search/issues");
     url.search = new URLSearchParams({
-      q: `${GITHUB_EVIDENCE_REPOSITORIES.map((repo) => `repo:${repo}`).join(" ")} is:issue is:public updated:>=${since}`,
+      q: `${repositories.map((repo) => `repo:${repo}`).join(" ")} is:issue is:public updated:>=${since}`,
       sort: "updated",
       order: "desc",
       per_page: String(CAP),
@@ -356,11 +395,7 @@ export async function collectGithub(
         "https://api.github.com/repos/",
         "",
       );
-      if (
-        !GITHUB_EVIDENCE_REPOSITORIES.includes(
-          repository as (typeof GITHUB_EVIDENCE_REPOSITORIES)[number],
-        )
-      )
+      if (!repositories.includes(repository))
         throw new Error("Repositorio fuera de cobertura");
       if (item.pull_request) continue;
       if (
@@ -368,6 +403,12 @@ export async function collectGithub(
         `https://github.com/${repository}/issues/${item.number}`
       )
         throw new Error("Enlace de issue inválido");
+      if (
+        Date.parse(item.created_at) > now.getTime() ||
+        Date.parse(item.updated_at) > now.getTime() ||
+        Date.parse(item.updated_at) < Date.parse(item.created_at)
+      )
+        throw new Error("Fecha de issue fuera del corte");
       latest = new Date(
         Math.max(Date.parse(latest), Date.parse(item.updated_at)),
       ).toISOString();
@@ -399,7 +440,7 @@ export async function collectGithub(
         ...new Map(records.map((record) => [record.id, record])).values(),
       ],
       state: {
-        id: "github",
+        id: source,
         status:
           data.incomplete_results || data.total_count > data.items.length
             ? "limited"
@@ -407,10 +448,10 @@ export async function collectGithub(
         checkedAt: now.toISOString(),
         count: new Set(records.map((record) => record.id)).size,
         cursor: data.incomplete_results ? previous?.cursor : latest,
-        message: `Muestra de hasta ${CAP} issues por actualización en ${GITHUB_EVIDENCE_REPOSITORIES.join(", ")}; excluye PR y bots. La fecha del caso es la creación original. Cobertura parcial, sin país inferido.${data.incomplete_results ? " GitHub devolvió resultados incompletos; cursor anterior conservado." : ""}`,
+        message: `Muestra de hasta ${CAP} issues por actualización en ${repositories.join(", ")}; excluye PR y bots. La fecha del caso es la creación original. Cobertura parcial, sin país inferido.${source === "github-mx" ? " Contexto técnico CFDI/SAT de México; no verifica ubicación ni demanda de empresas mexicanas." : ""}${data.incomplete_results ? " GitHub devolvió resultados incompletos; cursor anterior conservado." : ""}`,
       },
     };
   } catch (error) {
-    return failure("github", previous, now, error);
+    return failure(source, previous, now, error);
   }
 }
