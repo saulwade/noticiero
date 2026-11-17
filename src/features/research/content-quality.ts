@@ -75,3 +75,21 @@ export function reportsResolution(value: string) {
 }
 export const operationalFailure =
   /\b(?:cannot|can['’]t|unable|blocked|fails?|failed|failure|broken|corrupt\w*|overwrit\w*|sobrescrib\w*|rechaz\w*|(?:basep|importep).{0,70}por debajo|status.{0,80}(?:same as old|not updated|stale)|crash\w*|freez\w*|error|incorrect|inaccurate|401|403|pgrst303|silently (?:drop\w*|fail\w*|remov\w*)|(?:does|did)(?:n['’]t| not)[\s\S]{0,35}(?:work\w*|load\w*|upload\w*|download\w*|line up|select\w*)|not[\s\S]{0,20}(?:upload\w*|download\w*|translat\w*|detect\w*|receiv\w*)|(?:encountering|having|have) (?:a|one|the) problem|deletes? (?:the rest|part|all)|glitch\w*|laggy|jitter\w*|resets? to|too (?:long|slow)|lack.{0,25}(?:detail|information)|missing|mismatch|reject\w*|denied|spills?|black frame|no funciona|no puedo|fall[ao]\w*|no (?:carga|sincroniza|recibo|permite)|negativa|incumpl\w*)\b/i;
+
+export function isSelfPromotion(value: string) {
+  const text = normalizedText(value);
+  const creation =
+    /\b(?:i|we)\s+(?:built|created|launched|developed|released|made)\b|\b(?:construi|construimos|lance|lanzamos|creamos)\b/.test(
+      text,
+    );
+  const marketing =
+    /\b(?:try (?:it|my|our)|sign up|free (?:tier|trial|credits)|open.source|check (?:it|my|our) out|(?:we|i) (?:offer|sell)|prueba (?:mi|nuestra)|registrate)\b/.test(
+      text,
+    );
+  const disclosure =
+    /\b(?:for transparency|full disclosure)\b[\s\S]{0,60}\b(?:i(?:'m| am)|we(?:'re| are))\s+(?:exploring|building|launching|selling)\b/.test(
+      text,
+    );
+  const ownProduct = /\b(?:our|my) (?:tool|app|product|platform)\b/.test(text);
+  return (creation && marketing) || disclosure || (ownProduct && marketing);
+}

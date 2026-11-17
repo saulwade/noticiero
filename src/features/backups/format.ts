@@ -7,6 +7,11 @@ import {
 import { gzipSync, gunzipSync } from "node:zlib";
 
 export const backupColumns: Record<string, string[]> = {
+  idea_memory: ["id", "data"],
+  idea_journal: ["id", "data"],
+  idea_links: ["id", "data"],
+  idea_source_checks: ["id", "data"],
+  idea_assessments: ["id", "data"],
   business_news: ["id", "data"],
   business_news_sources: ["id", "data"],
   finance_profiles: ["id", "data"],
@@ -70,7 +75,7 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
     data.version !== 1 ||
     !Number.isFinite(Date.parse(data.createdAt)) ||
     !Array.isArray(data.tables) ||
-    ![22, 26, 33, 34, 37, 41, Object.keys(backupColumns).length].includes(
+    ![22, 26, 33, 34, 37, 41, 43, Object.keys(backupColumns).length].includes(
       data.tables.length,
     )
   )
@@ -115,6 +120,7 @@ export function validateSnapshot(raw: unknown): BackupSnapshot {
     "finance_analyses",
   ]);
   const required = Object.keys(backupColumns).filter((name) => {
+    if (data.tables.length <= 43 && name.startsWith("idea_")) return false;
     if (data.tables.length <= 41 && name.startsWith("business_news"))
       return false;
     if (data.tables.length < 41 && automatic.has(name)) return false;

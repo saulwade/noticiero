@@ -17,6 +17,8 @@ import {
   researchDigestMarkdown,
 } from "@/features/evidence/research-digest";
 import type { EvidenceRecord, EvidenceReview } from "@/features/evidence/types";
+import type { IdeaMemoryData } from "@/features/idea-memory/types";
+import { ideaMemoryMarkdown } from "@/features/idea-memory/markdown";
 
 const clean = (text: string) =>
   text
@@ -40,6 +42,7 @@ export function createDailyReport(
   ideas: Opportunity[],
   now = new Date(),
   evidence?: { records: EvidenceRecord[]; reviews: EvidenceReview[] },
+  memory?: IdeaMemoryData,
 ): DailyReport {
   const cutoff = new Date(
     Math.min(now.getTime(), Date.parse(`${date}T23:59:59.999-06:00`)),
@@ -201,6 +204,7 @@ export function createDailyReport(
       );
   }
   if (researchDigest) lines.push(...researchDigestMarkdown(researchDigest));
+  if (memory?.definitions.length) lines.push(ideaMemoryMarkdown(memory, true));
   lines.push("## Hipótesis para validar", "");
   if (!relatedIdeas.length)
     lines.push(
@@ -234,6 +238,14 @@ export function createDailyReport(
     "La cobertura es una muestra acotada de fuentes públicas. No representa todo el mercado. Los autores no se han verificado, una queja no prueba disposición a pagar y las agrupaciones pueden contener errores. Las citas conservan su idioma original. No se contactó a ninguna persona. Las notas y los enlaces permiten comprobar cada señal.",
   );
   return {
+    ...(memory?.definitions.length
+      ? {
+          ideaMemory: {
+            version: memory.version,
+            assessmentIds: memory.assessments.map((a) => a.id),
+          },
+        }
+      : {}),
     date,
     ...(researchDigest ? { researchDigest } : {}),
     news,
@@ -252,6 +264,7 @@ export function createDailyReport(
         provisional,
         contextKeywords,
         researchDigest,
+        ideaMemory: memory?.assessments.map((a) => a.id),
       }),
     ),
     provisional,

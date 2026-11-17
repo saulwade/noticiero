@@ -168,6 +168,18 @@ export function OperationsView({
         se conservan en segundo plano. No necesitas abrir una sección ni
         rellenar formularios; los revisamos en conversación cuando lo pidas.
       </p>
+      {data.research?.memory ? (
+        <p
+          className="research-explanation"
+          aria-label="Estado de la memoria de ideas"
+        >
+          Memoria de ideas · {data.research.memory.definitions.length} líneas
+          conservadas · {data.research.memory.assessmentCount} evaluaciones
+          archivadas. Último corte: {date(data.research.memory.updatedAt)}. La
+          evidencia a favor, las contradicciones y las decisiones se conservan
+          para nuestra próxima revisión.
+        </p>
+      ) : null}
       <section className="operations-alerts">
         <h2>
           {ops?.alerts.length ? (

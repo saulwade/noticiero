@@ -276,7 +276,10 @@ describe("archivo de investigación financiera sin cartera", () => {
   });
   it("los backups aceptan archivos completos22/26/33/34/37/41 y rechazan mezcla parcial", () => {
     const tables = Object.keys(backupColumns)
-      .filter((name) => !name.startsWith("business_news"))
+      .filter(
+        (name) =>
+          !name.startsWith("business_news") && !name.startsWith("idea_"),
+      )
       .map((name) => ({
         name,
         rows: [],

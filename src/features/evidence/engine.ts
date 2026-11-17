@@ -27,6 +27,7 @@ import {
   isRecruitment,
   operationalFailure,
   reportsResolution,
+  isSelfPromotion,
 } from "@/features/research/content-quality";
 import { evidenceTimeline, timelineMarkdown } from "./timeline";
 
@@ -59,6 +60,7 @@ export function problemContext(record: EvidenceRecord) {
     Boolean(own) &&
     !isRecruitment(`${record.title}. ${own}`) &&
     !isHypothetical(own) &&
+    !isSelfPromotion(own) &&
     (record.kind === "complaint" || Boolean(classifySignal(own)) || githubCase);
   const fields: ProblemDossier["fields"] = {
     segment: grounded(record.quote, rolePattern),

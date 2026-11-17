@@ -320,7 +320,8 @@ describe("evidencia contextual y persistencia", () => {
           (n) =>
             !n.startsWith("evidence_") &&
             !n.startsWith("finance_") &&
-            !n.startsWith("business_news"),
+            !n.startsWith("business_news") &&
+            !n.startsWith("idea_"),
         )
         .map((name) => ({ name, rows: [] })),
     };

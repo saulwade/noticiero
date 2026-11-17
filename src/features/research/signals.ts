@@ -9,6 +9,7 @@ import {
   isRecruitment,
   operationalFailure,
   describesPastWorkaround,
+  isSelfPromotion,
 } from "./content-quality";
 
 const request =
@@ -30,6 +31,10 @@ export function classifySignal(
     isRecruitment(sentence) ||
     isHypothetical(sentence) ||
     isEditorialReflection(sentence) ||
+    isSelfPromotion(sentence) ||
+    /\b(?:i|we) (?:can['’]t|cannot) think of a (?:more|better) .{0,30}(?:name|analogy|example)\b/i.test(
+      sentence,
+    ) ||
     describesPastWorkaround(sentence) ||
     /^you receive a response\b/.test(sentence) ||
     /\b(?:as mentioned by my colleague|you are contacting us from an email address)\b/.test(
@@ -83,6 +88,7 @@ export function extractSignals(
       : authoredText(
           `${story.originalTitle ?? story.title}. ${story.authoredExcerpt ?? story.excerpt}`,
         );
+  if (isSelfPromotion(content)) return [];
   const sentences = content
     .split(/(?<=[.!?])\s+/)
     .map((part) => part.trim())

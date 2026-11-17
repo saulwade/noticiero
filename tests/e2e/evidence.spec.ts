@@ -4,7 +4,7 @@ import type { EvidenceData } from "../../src/features/evidence/types";
 test("evidencia y reportes disponibles sin una pantalla de investigación", async ({
   page,
   isMobile,
-}) => {
+}, testInfo) => {
   await page.goto("/");
   const evidence = await page.request.get("/api/evidence");
   expect(evidence.ok()).toBe(true);
@@ -16,6 +16,15 @@ test("evidencia y reportes disponibles sin una pantalla de investigación", asyn
   const report = await page.request.get("/api/research/brief?days=3");
   expect(report.ok()).toBe(true);
   expect(await report.text()).toContain("Noticiero · investigación de");
+  const memory = await page.request.get("/api/research/memory");
+  expect(memory.ok()).toBe(true);
+  expect(memory.headers()["cache-control"]).toContain("no-store");
+  expect((await memory.json()).version).toBe("idea-memory-v1");
+  const memoryExport = await page.request.get("/api/research/memory?format=md");
+  expect(memoryExport.ok()).toBe(true);
+  expect(await memoryExport.text()).toContain(
+    "Memoria de ideas y calidad de evidencia",
+  );
   await expect(
     page.locator(
       ".evidence-workspace,.research-workspace,.idea-notes,.ideas-tab-panel",
@@ -33,6 +42,13 @@ test("evidencia y reportes disponibles sin una pantalla de investigación", asyn
   await expect(
     page.getByLabel("Estado de la investigación automática"),
   ).toContainText("se conservan en segundo plano");
+  await expect(page.getByLabel("Estado de la memoria de ideas")).toContainText(
+    "evaluaciones archivadas",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("operations-memory.png"),
+    fullPage: true,
+  });
   const after: EvidenceData = await (
     await page.request.get("/api/evidence")
   ).json();

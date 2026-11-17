@@ -219,7 +219,10 @@ describe("archivo financiero independiente y auditable", () => {
   });
   it("acepta respaldos anteriores completos22/26 33/34, nunca parciales", () => {
     const tables = Object.keys(backupColumns)
-      .filter((name) => !name.startsWith("business_news"))
+      .filter(
+        (name) =>
+          !name.startsWith("business_news") && !name.startsWith("idea_"),
+      )
       .map((name) => ({
         name,
         rows: [],

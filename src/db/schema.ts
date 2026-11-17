@@ -55,6 +55,34 @@ import type {
   ArchivedBusinessNews,
   BusinessSourceState,
 } from "@/features/business-news/types";
+import type {
+  IdeaDefinition,
+  IdeaDecision,
+  IdeaEvidence,
+  IdeaSourceCheck,
+  IdeaAssessment,
+} from "@/features/idea-memory/types";
+
+export const ideaMemory = pgTable("idea_memory", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<IdeaDefinition>().notNull(),
+});
+export const ideaJournal = pgTable("idea_journal", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<IdeaDecision>().notNull(),
+});
+export const ideaLinks = pgTable("idea_links", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<IdeaEvidence>().notNull(),
+});
+export const ideaSourceChecks = pgTable("idea_source_checks", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<IdeaSourceCheck>().notNull(),
+});
+export const ideaAssessments = pgTable("idea_assessments", {
+  id: text("id").primaryKey(),
+  data: jsonb("data").$type<IdeaAssessment>().notNull(),
+});
 
 export const businessNews = pgTable("business_news", {
   id: text("id").primaryKey(),
@@ -239,6 +267,16 @@ export const backupRuns = pgTable("backup_runs", {
 
 // One PostgreSQL schema for the embedded database and a hosted PostgreSQL server.
 export const migrations = [
+  ...[
+    "idea_memory",
+    "idea_journal",
+    "idea_links",
+    "idea_source_checks",
+    "idea_assessments",
+  ].map(
+    (name) =>
+      `CREATE TABLE IF NOT EXISTS ${name} (id text PRIMARY KEY, data jsonb NOT NULL)`,
+  ),
   `CREATE TABLE IF NOT EXISTS business_news (id text PRIMARY KEY, data jsonb NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS business_news_sources (id text PRIMARY KEY, data jsonb NOT NULL)`,
   ...[

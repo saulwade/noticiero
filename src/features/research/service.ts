@@ -24,7 +24,11 @@ import { editionFor } from "@/lib/time";
 import { hash } from "@/features/news/normalize";
 import { recordOpportunity } from "./archive";
 import { authoredText } from "./evidence-text";
-import { isRecruitment } from "./content-quality";
+import { isRecruitment, isSelfPromotion } from "./content-quality";
+import {
+  getIdeaMemory,
+  refreshIdeaMemory,
+} from "@/features/idea-memory/service";
 
 export async function getResearchData(): Promise<ResearchData> {
   const db = await getDb();
@@ -55,6 +59,8 @@ export async function getResearchData(): Promise<ResearchData> {
     if (isRecruitment(row.data.title)) return [];
     const quote = authoredText(row.data.quote);
     const source = sources.get(row.data.storyId);
+    if (source && isSelfPromotion(source.authoredExcerpt ?? source.excerpt))
+      return [];
     // A newly retained paragraph boundary can prove that a legacy flattened
     // quotation was somebody else's text. An actual later content edit does
     // not erase a previously captured, versioned first-person statement.
@@ -75,6 +81,7 @@ export async function getResearchData(): Promise<ResearchData> {
     models[0]?.data ?? trainModel(undefined, []),
   );
   return {
+    memory: await getIdeaMemory(),
     observations: observations
       .map((row) => row.data)
       .sort((a, b) => b.at.localeCompare(a.at)),
@@ -195,6 +202,8 @@ export async function runLocalResearch(
       })
       .onConflictDoNothing();
   });
+  await guard();
+  await refreshIdeaMemory(now, guard);
   if (localHour(now) >= 20) {
     await guard();
     await saveDailyReport(edition.date, now);
@@ -245,6 +254,11 @@ export async function saveDailyReport(
       records: evidence.map((r) => r.data),
       reviews: reviews.map((r) => r.data),
     },
+    await getIdeaMemory(
+      new Date(
+        Math.min(now.getTime(), Date.parse(`${date}T23:59:59.999-06:00`)),
+      ),
+    ),
   );
   if (old?.inputHash === report.inputHash) return old;
   await db

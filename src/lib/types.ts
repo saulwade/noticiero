@@ -121,6 +121,7 @@ export type ResearchModel = {
   updatedAt: string;
 };
 export type DailyReport = {
+  ideaMemory?: { version: string; assessmentIds: string[] };
   researchDigest?: import("@/features/evidence/research-digest").ResearchDigest;
   date: string;
   generatedAt: string;
@@ -143,6 +144,7 @@ export type DailyReport = {
   news?: { title: string; excerpt: string; url: string; sourceName: string }[];
 };
 export type ResearchData = {
+  memory?: import("@/features/idea-memory/types").IdeaMemoryData;
   notes: ResearchNote[];
   signals: ResearchSignal[];
   reports: DailyReport[];
