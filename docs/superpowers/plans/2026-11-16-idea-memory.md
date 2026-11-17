@@ -31,3 +31,7 @@
 ## Verificación final antes del push
 
 536 pruebas unitarias/integración, 38 E2E de escritorio/móvil, lint, tipos y build aprobados. Comparación final de las 9,876 filas previas: cero IDs faltantes, cero reportes cerrados modificados y contenido financiero idéntico. Sólo se añadió un reporte provisional del día a las tablas anteriores. Respaldo nuevo completo de 48 tablas y 10,762 filas restaurado en PGlite temporal, incluyendo 14 definiciones, 5 decisiones, 838 vínculos, 12 comprobaciones y 16 evaluaciones. Las consultas públicas pendientes continúan por turnos; no se afirma cobertura total ni validación comercial.
+
+## Corrección de instalación limpia
+
+El primer despliegue y la prueba manual del respaldo detectaron un lockfile incompleto para dependencias opcionales de WASM (`@emnapi`). Se regeneró en un directorio temporal sin node_modules y se comprobó `npm ci` con Node 24, sin cambiar ninguna versión existente. Desde esa instalación nueva pasaron otra vez las 536 pruebas y la compilación de producción. Los intentos fallidos no sustituyeron el despliegue productivo anterior; se repiten publicación y respaldo con el lockfile corregido.
