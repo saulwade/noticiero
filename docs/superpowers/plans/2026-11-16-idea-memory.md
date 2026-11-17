@@ -16,7 +16,7 @@
 - [x] Connect service to `runLocalResearch` and daily report generation, add memory Markdown to private `researchBrief`, authenticated read-only `/api/research/memory`, and concise counts to the existing operations view. Retain old reports and no new navigation or portfolio changes.
 - [x] Add private validated import script for four existing dossiers and documented decisions/alternatives; include provenance and evidence URLs. Create backup read grants for new tables without changing old data or broader privileges.
 - [x] Extend backup compatibility tests to retain the 43-table format and verify new-table restore. Run unit/integration, frozen evaluation, lint excluding `research/**`, typecheck, build, and E2E desktop/mobile including private export.
-- [ ] Self-review diffs and resolve issues. Commit only explicit source/doc/test paths, publish via the existing project and verify deployment Ready. Activate only memory/research, verify four definitions and current assessments in Neon, recapture encrypted snapshot and compare every prior ID, immutable report and finance row. Update this plan with actual results and limits.
+- [x] Self-review diffs and resolve issues. Commit only explicit source/doc/test paths, publish via the existing project and verify deployment Ready. Activate only memory/research, verify four definitions and current assessments in Neon, recapture encrypted snapshot and compare every prior ID, immutable report and finance row. Update this plan with actual results and limits.
 
 ## Evidencia previa a publicación
 
@@ -35,3 +35,12 @@
 ## Corrección de instalación limpia
 
 El primer despliegue y la prueba manual del respaldo detectaron un lockfile incompleto para dependencias opcionales de WASM (`@emnapi`). Se regeneró en un directorio temporal sin node_modules y se comprobó `npm ci` con Node 24, sin cambiar ninguna versión existente. Desde esa instalación nueva pasaron otra vez las 536 pruebas y la compilación de producción. Los intentos fallidos no sustituyeron el despliegue productivo anterior; se repiten publicación y respaldo con el lockfile corregido.
+
+## Publicación y respaldo comprobados
+
+- Versión funcional `e14a7a7` publicada en producción: despliegue `dpl_4HQ2kQBHv3ita75RmQcXHTCaLBrF` en estado Ready, con alias https://noticiero-self.vercel.app.
+- Respaldo manual del workflow existente: ejecución `43997610407` finalizó success, incluyendo archivo histórico privado, verificación de descarga, registro y monitor. No se ejecutó el workflow financiero.
+- Se descargó el artefacto cifrado de esa ejecución y se restauró en PGlite temporal: 48 tablas, 10,764 filas; se verificaron 14 definiciones, 5 decisiones, 838 vínculos, 12 comprobaciones y 16 evaluaciones. El incremento de dos filas frente al corte previo es una fila en `operation_alerts` y otra en `backup_runs`; no supone dos casos de demanda.
+- La integración automática usa las ediciones existentes; la activación de memoria y el reporte provisional del día se comprobaron en Neon. No se creó otra programación ni se prometen cobertura exhaustiva, autoentrenamiento o negocios validados.
+
+La comprobación HTTP de producción devolvió 200 en `/login` y 401 sin sesión en ambas exportaciones de memoria (JSON y Markdown), como corresponde al acceso privado. La revisión autenticada de interfaz se cubrió con las 38 pruebas E2E locales; no se afirma haber repetido una sesión de usuario completa en producción.
