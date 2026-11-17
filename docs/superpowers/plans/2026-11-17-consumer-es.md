@@ -13,7 +13,7 @@
 - [x] Extend optional record/link types with app metadata/dateBasis; exclude source_updated from original-publication comparisons in timeline/memory. Reserve up to two of five new idea slots for consumer scopes. No original rows/definitions changed.
 - [x] Add `src/features/evidence/consumer-digest.ts`; attach optional digest and Markdown to existing daily/private research reports. Keep global Spanish focus and country unknown; no UI or mandatory manual steps. Document limits in `docs/consumer-apps-method.md`.
 - [x] Run focused failing/passing regressions, full tests, frozen evaluation, lint/types/build and appropriate existing E2E. Review modified paths and all counters/citations.
-- [ ] Capture encrypted production baseline; activate only the new connector and memory/report with existing owner configuration. Verify real source states, preservation, idempotency and full encrypted restore including new JSON fields. Publish existing Vercel app, verify Ready/private access/monitor and backup. Record actual coverage/errors, no claims of exhaustive reach.
+- [x] Capture encrypted production baseline; activate only the new connector and memory/report with existing owner configuration. Verify real source states, preservation, idempotency and full encrypted restore including new JSON fields. Publish existing Vercel app, verify Ready/private access/monitor and backup. Record actual coverage/errors, no claims of exhaustive reach.
 
 ## Revisión y evidencia de calidad
 
@@ -26,3 +26,7 @@ La muestra congelada de 100 ejemplos conserva hash 0fc59d5904aa086f70c254380fdfe
 Activación de investigación en Neon: 33 reseñas, 33 claves hash de cuentas públicas (no personas verificadas), cinco pistas aisladas y dos hipótesis consumer automáticas iniciales. Fuente App Store status ok, sin fallos en las tres consultas iniciales; cursor continúa desde la cuarta combinación. La carga repetida añadió cero duplicados. Se conservaron las cuatro ideas revisadas. La primera activación se demoró en una lectura transaccional; se interrumpió sólo el proceso manual y el reintento idempotente completó memoria y reporte. No se afirma que el primer intento nunca escribiera: el reintento encontró las reseñas ya persistidas.
 
 Comparación posterior de las 11,423 filas previas: cero IDs faltantes, cero filas anteriores modificadas y cero cambios en reportes cerrados; finanzas idénticas. Se añadieron 33 revisiones de evidencia, un estado de fuente, cinco definiciones (dos consumer), nueve vínculos, seis comprobaciones y ocho evaluaciones; un reporte nuevo del día. Sigue habiendo 48 tablas. El snapshot posterior cifrado se conserva para restauración temporal.
+
+## Publicación y conservación completadas
+
+Versión funcional 67b8c34 publicada en el despliegue dpl_BTdCEkTAWooqURcmkLDaTWXMDTeP, Ready con alias https://noticiero-self.vercel.app. El respaldo GitHub Actions 44139473979 terminó success, incluyendo archivo histórico privado y monitor. El snapshot local posterior de 48 tablas/11,486 filas se restauró en PGlite temporal; también se descargó el artefacto cifrado de esa ejecución y se restauró en otra base temporal. Se conservan pruebas privadas de los recuentos, cero IDs anteriores faltantes y finanzas idénticas. No se ejecutó el workflow financiero, no se agregaron tablas, jobs, planes, claves o dependencias.
