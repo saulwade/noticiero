@@ -11,6 +11,7 @@ import {
 import { hash, safePublicUrl } from "@/features/news/normalize";
 import { buildDossiers, weeklyReport } from "./engine";
 import { collectCfpb, collectGithub, collectGithubMexico } from "./connectors";
+import { collectAppReviews } from "./app-reviews";
 import {
   collectColombia,
   collectProfeco,
@@ -40,6 +41,7 @@ const defaults: ConnectorState[] = [
   "profeco",
   "profeco-telecom",
   "sfc-co",
+  "app-store",
 ].map((id) => ({
   id: id as ConnectorState["id"],
   status: "waiting",
@@ -292,6 +294,7 @@ export async function refreshEvidence(
     ["profeco", collectProfeco],
     ["profeco-telecom", collectProfecoTelecom],
     ["sfc-co", collectColombia],
+    ["app-store", collectAppReviews],
   ] as const) {
     const previous = old.sources.find((s) => s.id === id);
     // Public APIs are called at most every six hours, including after failures.
@@ -463,7 +466,7 @@ export async function evidenceMarkdown(now = new Date()) {
     ...data.records.flatMap((r) => [
       `### ${r.title}`,
       `${r.sourceName} · ${r.url} · país ${r.country ?? "desconocido"} · ${r.countryBasis ?? "sin evidencia geográfica"}`,
-      `Publicado ${r.occurredAt} · capturado ${r.capturedAt}`,
+      `${r.dateBasis === "source_updated" ? "Actualizado en fuente (publicación original desconocida)" : "Publicado"} ${r.occurredAt} · capturado ${r.capturedAt}`,
       `> ${r.quote.replace(/\n/g, " ")}`,
       `Evaluación: ${data.reviews.find((v) => v.id === r.id)?.decision ?? "sin evaluar"}`,
       `Nota: ${data.reviews.find((v) => v.id === r.id)?.note ?? ""}`,

@@ -45,6 +45,7 @@ export type IdeaEvidence = {
   authorKey?: string;
   country?: string;
   occurredAt: string;
+  dateBasis?: "source_updated";
   capturedAt: string;
   classifiedAt: string;
   mechanism: string;

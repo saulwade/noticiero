@@ -47,7 +47,7 @@ export function ideaMemoryMarkdown(memory: IdeaMemoryData, compact = false) {
               ...(!compact
                 ? a.evidence.flatMap((e) => [
                     `> ${text(e.quote)}`,
-                    `${e.url} · original ${e.occurredAt} · captura ${e.capturedAt} · ${e.quality}.`,
+                    `${e.url} · ${e.dateBasis === "source_updated" ? "actualizado en fuente (original desconocido)" : "original"} ${e.occurredAt} · captura ${e.capturedAt} · ${e.quality}.`,
                     ...Object.entries(e.fields).map(
                       ([key, value]) => `${key}: ${text(value)}`,
                     ),

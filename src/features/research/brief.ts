@@ -11,6 +11,10 @@ import { timelineAssessor } from "@/features/evidence/engine";
 import { keywordSummary } from "./keyword-summary";
 import { getIdeaMemory } from "@/features/idea-memory/service";
 import { ideaMemoryMarkdown } from "@/features/idea-memory/markdown";
+import {
+  buildConsumerDigest,
+  consumerDigestMarkdown,
+} from "@/features/evidence/consumer-digest";
 const plain = (value: string) => value.replace(/[<>]/g, "");
 export async function researchBrief(days: number, now = new Date()) {
   const [research, saved, evidence] = await Promise.all([
@@ -35,6 +39,11 @@ export async function researchBrief(days: number, now = new Date()) {
     "",
   ];
   lines.push(ideaMemoryMarkdown(await getIdeaMemory(now)), "");
+  lines.push(
+    ...consumerDigestMarkdown(
+      buildConsumerDigest(evidence.records, evidence.reviews, now),
+    ),
+  );
   lines.push(
     "## Problemas prioritarios y lagunas de evidencia",
     "",

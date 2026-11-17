@@ -1007,7 +1007,9 @@ function Record({
         </p>
       )}
       <p className="ev-dates">
-        Publicado:{" "}
+        {record.dateBasis === "source_updated"
+          ? "Actualizado en fuente (original desconocido):"
+          : "Publicado:"}{" "}
         {date(
           record.kind === "complaint"
             ? record.occurredAt.slice(0, 10)

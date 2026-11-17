@@ -161,7 +161,7 @@ export function evidenceTimeline(
     if (firstDay >= from && firstDay <= to) {
       group.newCases++;
       if (day(latest.occurredAt) < from) group.historicalCases++;
-      else group.publishedCases++;
+      else if (latest.dateBasis !== "source_updated") group.publishedCases++;
       if (!latest.authorKey && latest.kind === "complaint")
         group.anonymousNewCases++;
     } else if (captures.length) group.updatedCases++;

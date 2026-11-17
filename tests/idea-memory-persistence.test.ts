@@ -81,6 +81,41 @@ beforeEach(async () => {
     await db.delete(table);
 });
 describe("memoria persistente append-only", () => {
+  it("no registra una hipótesis consumer con sólo resolución, pero conserva ese antecedente al aparecer un obstáculo", async () => {
+    const db = await getDb();
+    const fixed: EvidenceRecord = {
+      ...evidence,
+      id: "consumer-fixed",
+      externalId: "consumer-fixed",
+      source: "app-store",
+      sourceName: "App Store",
+      url: "https://apps.apple.com/app/id580669177?reviewId=1",
+      language: "es",
+      product: "Bring!",
+      appCategory: "listas-compras",
+      dateBasis: "source_updated",
+      quote: "Ya funciona la sincronización de la lista con mi pareja.",
+    };
+    await db.insert(evidenceRecords).values({ id: fixed.id, data: fixed });
+    await refreshIdeaMemory(now);
+    expect((await getIdeaMemory(now)).definitions).toHaveLength(0);
+    const active: EvidenceRecord = {
+      ...fixed,
+      id: "consumer-active",
+      externalId: "consumer-active",
+      authorKey: "app-store:b",
+      url: "https://apps.apple.com/app/id580669177?reviewId=2",
+      quote: "No puedo sincronizar la lista con mi pareja.",
+    };
+    await db.insert(evidenceRecords).values({ id: active.id, data: active });
+    await refreshIdeaMemory(now);
+    const memory = await getIdeaMemory(now);
+    expect(memory.definitions).toHaveLength(1);
+    expect(memory.assessments[0].totals).toMatchObject({
+      activeCases: 1,
+      resolved: 1,
+    });
+  });
   it("importa revisión privada e idempotente sin sobrescribir definiciones ni decisiones", async () => {
     await importIdeaMemory(
       { definitions: [definition], decisions: [decision] },

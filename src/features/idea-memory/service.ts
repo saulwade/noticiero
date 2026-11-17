@@ -11,7 +11,7 @@ import {
   evidenceReviews,
   stories,
 } from "@/db/schema";
-import { buildDossiers } from "@/features/evidence/engine";
+import { buildDossiers, problemContext } from "@/features/evidence/engine";
 import { isSpecificScope } from "@/features/research/problem-scope";
 import { linkIdeaEvidence, classifyStoryContext } from "./quality";
 import { assessIdea } from "./engine";
@@ -218,7 +218,22 @@ export async function refreshIdeaMemory(
   const registeredScopes = new Set(
     definitions.flatMap((d) => (d.match.scopeKey ? [d.match.scopeKey] : [])),
   );
-  const automatic = buildDossiers(raw, human, now)
+  const liveConsumerIds = new Set(
+    raw
+      .filter(
+        (r) =>
+          r.source === "app-store" &&
+          problemContext(r).accepted &&
+          !problemContext(r).correction,
+      )
+      .map((r) => r.id),
+  );
+  const candidates = buildDossiers(raw, human, now)
+    .filter(
+      (d) =>
+        !d.scope?.key.startsWith("consumer:") ||
+        d.evidenceIds.some((id) => liveConsumerIds.has(id)),
+    )
     .filter(
       (d) =>
         d.scope &&
@@ -230,17 +245,24 @@ export async function refreshIdeaMemory(
       if (registeredScopes.has(d.scope!.key)) return false;
       registeredScopes.add(d.scope!.key);
       return true;
-    })
-    .slice(0, 5)
-    .map((d): IdeaDefinition => ({
-      id: `AUTO-${d.id}`,
-      title: d.label,
-      hypothesis: `Investigar el mecanismo documentado en ${d.alternatives.join(", ") || "el proceso señalado"}; comprador y solución pendientes.`,
-      origin: "automatic",
-      createdAt: now.toISOString(),
-      match: { scopeKey: d.scope!.key, groups: [] },
-      sources: [],
-    }));
+    });
+  const consumer = candidates.filter((d) =>
+    d.scope!.key.startsWith("consumer:"),
+  );
+  const selected = [
+    ...consumer.slice(0, 2),
+    ...candidates.filter((d) => !d.scope!.key.startsWith("consumer:")),
+    ...consumer.slice(2),
+  ].slice(0, 5);
+  const automatic = selected.map((d): IdeaDefinition => ({
+    id: `AUTO-${d.id}`,
+    title: d.label,
+    hypothesis: `Investigar el mecanismo documentado en ${d.alternatives.join(", ") || "el proceso señalado"}; comprador y solución pendientes.`,
+    origin: "automatic",
+    createdAt: now.toISOString(),
+    match: { scopeKey: d.scope!.key, groups: [] },
+    sources: [],
+  }));
   definitions.push(...automatic);
   const lastAssessment = new Map<string, string>();
   for (const row of previousAssessments)

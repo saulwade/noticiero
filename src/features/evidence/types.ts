@@ -5,7 +5,8 @@ export type EvidenceSource =
   | "cfpb"
   | "profeco"
   | "profeco-telecom"
-  | "sfc-co";
+  | "sfc-co"
+  | "app-store";
 export type EvidenceRecord = {
   revision?: number;
   id: string;
@@ -30,6 +31,10 @@ export type EvidenceRecord = {
   period?: string;
   aggregateCount?: number;
   caseStatus?: "open" | "closed";
+  dateBasis?: "source_updated";
+  appId?: string;
+  appCategory?: string;
+  rating?: number;
 };
 export type ConnectorState = {
   blocked?: boolean;

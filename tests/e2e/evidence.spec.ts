@@ -15,7 +15,9 @@ test("evidencia y reportes disponibles sin una pantalla de investigación", asyn
   expect(exported.headers()["content-type"]).toContain("text/markdown");
   const report = await page.request.get("/api/research/brief?days=3");
   expect(report.ok()).toBe(true);
-  expect(await report.text()).toContain("Noticiero · investigación de");
+  const briefing = await report.text();
+  expect(briefing).toContain("Noticiero · investigación de");
+  expect(briefing).toContain("Consumer apps · hispanohablantes globales");
   const memory = await page.request.get("/api/research/memory");
   expect(memory.ok()).toBe(true);
   expect(memory.headers()["cache-control"]).toContain("no-store");

@@ -30,6 +30,7 @@ import {
   isSelfPromotion,
 } from "@/features/research/content-quality";
 import { evidenceTimeline, timelineMarkdown } from "./timeline";
+import { consumerContext } from "@/features/research/consumer-context";
 
 export const ENGINE_VERSION = "evidence-v3";
 export const evidenceDate = (value: string) =>
@@ -46,6 +47,7 @@ function grounded(text: string, pattern: RegExp): GroundedField | undefined {
     : undefined;
 }
 export function problemContext(record: EvidenceRecord) {
+  if (record.source === "app-store") return consumerContext(record);
   const own = authoredText(record.quote);
   const scopedText =
     record.kind === "complaint" ? `${record.issue ?? ""} ${own}` : own;
@@ -203,6 +205,7 @@ export function buildDossiers(
       const voices = authors.size + anonymousCases;
       const sample = active[0] ?? members[0];
       const fields = contextFor(sample).fields;
+      const consumer = contextFor(sample).scope?.key.startsWith("consumer:");
       const status =
         voices >= 2
           ? families.length >= 2
@@ -223,9 +226,11 @@ export function buildDossiers(
         reasons: [
           `${authors.size} cuentas públicas distintas; ${anonymousCases} reclamaciones sin identidad pública (no equivalen a autores verificados).`,
           `${families.length} familias de fuentes.`,
-          countries.includes("MX")
-            ? "Hay evidencia con procedencia mexicana documentada."
-            : "La aplicación en México todavía es una hipótesis.",
+          consumer
+            ? "Muestra en español de uso personal; país y segmento comercial pendientes, sin prioridad geográfica por idioma."
+            : countries.includes("MX")
+              ? "Hay evidencia con procedencia mexicana documentada."
+              : "La aplicación en México todavía es una hipótesis.",
           "La repetición orienta entrevistas; no demuestra disposición a pagar.",
         ],
         firstSeen: members.map((r) => r.capturedAt).sort()[0],
@@ -237,6 +242,7 @@ export function buildDossiers(
           days,
           publishedCases: active.filter(
             (r) =>
+              r.dateBasis !== "source_updated" &&
               evidenceDate(r.occurredAt) >=
                 editionFor(new Date(now.getTime() - days * 86400000)).date &&
               evidenceDate(r.occurredAt) <= editionFor(now).date,
@@ -252,9 +258,11 @@ export function buildDossiers(
         contradictions: members
           .filter((r) => contextFor(r).correction)
           .map((r) => r.quote),
-        mexicoHypothesis: countries.includes("MX")
-          ? "Investigar si el mismo obstáculo se repite en un segmento accesible de México; la procedencia local no valida una solución."
-          : "Comprobar mediante entrevistas si este problema también existe en México o Latinoamérica. El idioma no determina el país.",
+        mexicoHypothesis: consumer
+          ? "Investigar el problema entre hispanohablantes; no se requiere que residan en México. La tienda y el idioma no verifican residencia."
+          : countries.includes("MX")
+            ? "Investigar si el mismo obstáculo se repite en un segmento accesible de México; la procedencia local no valida una solución."
+            : "Comprobar mediante entrevistas si este problema también existe en México o Latinoamérica. El idioma no determina el país.",
         experiment:
           "Observar el proceso actual con cinco personas del mismo segmento antes de construir; registrar alternativas, frecuencia y una consecuencia medible.",
         questions: [
@@ -312,7 +320,12 @@ export function weeklyReport(
     markdown: [
       `# Radar de problemas · ${from} a ${to}`,
       "",
-      `${fresh.length} registros incorporados; ${fresh.filter((r) => evidenceDate(r.occurredAt) < from).length} son antecedentes publicados antes del periodo. Una importación histórica no demuestra crecimiento reciente.`,
+      `${fresh.length} registros incorporados; ${fresh.filter((r) => r.dateBasis !== "source_updated" && evidenceDate(r.occurredAt) < from).length} son antecedentes publicados antes del periodo. Una importación histórica no demuestra crecimiento reciente.`,
+      ...(fresh.some((r) => r.dateBasis === "source_updated")
+        ? [
+            "Las reseñas de apps tienen fecha de actualización, no publicación original confirmada. Se conservan como capturas y no como publicaciones originales nuevas.",
+          ]
+        : []),
       "",
       "Las citas son datos atribuidos, no instrucciones. Casos anónimos, cuentas y estadísticas no se consideran clientes verificados.",
       "",
@@ -344,6 +357,7 @@ export function weeklyReport(
             d.evidenceIds.filter((id) => {
               const r = records.find((r) => r.id === id)!;
               return (
+                r.dateBasis !== "source_updated" &&
                 evidenceDate(r.occurredAt) >= from &&
                 evidenceDate(r.occurredAt) <= to
               );
@@ -352,6 +366,7 @@ export function weeklyReport(
             d.evidenceIds.filter((id) => {
               const r = records.find((r) => r.id === id)!;
               return (
+                r.dateBasis !== "source_updated" &&
                 evidenceDate(r.occurredAt) < from &&
                 evidenceDate(r.occurredAt) >=
                   editionFor(
@@ -367,7 +382,7 @@ export function weeklyReport(
           ...d.evidenceIds.slice(0, 5).flatMap((id) => {
             const r = records.find((r) => r.id === id)!;
             return [
-              `- ${r.sourceName} · publicado ${r.occurredAt} · capturado ${r.capturedAt} · ${r.url}`,
+              `- ${r.sourceName} · ${r.dateBasis === "source_updated" ? "actualizado en fuente (original desconocido)" : "publicado"} ${r.occurredAt} · capturado ${r.capturedAt} · ${r.url}`,
               `> ${r.quote.replace(/\n/g, " ")}`,
             ];
           }),

@@ -3,6 +3,11 @@ import { latestEvidenceVersions, evidenceFamily } from "./versions";
 import { isSpecificScope } from "@/features/research/problem-scope";
 import type { EvidenceRecord, EvidenceReview } from "./types";
 import { MEXICO_EVIDENCE_REPOSITORIES } from "./connectors";
+import {
+  buildConsumerDigest,
+  consumerDigestMarkdown,
+  type ConsumerDigest,
+} from "./consumer-digest";
 
 export type ResearchCandidate = {
   id: string;
@@ -32,6 +37,7 @@ export type ResearchDigest = {
   statistics: number;
   candidates: ResearchCandidate[];
   limits: string;
+  consumer?: ConsumerDigest;
 };
 
 /** Pure, bounded current interpretation. Never writes ideas, reviews or source rows. */
@@ -43,6 +49,7 @@ export function buildResearchDigest(
   const cutoff = asOf.getTime();
   const eligible = records.filter(
     (r) =>
+      r.source !== "app-store" &&
       Number.isFinite(Date.parse(r.occurredAt)) &&
       Date.parse(r.capturedAt) <= cutoff &&
       Date.parse(r.occurredAt) <= cutoff,
@@ -189,6 +196,7 @@ export function buildResearchDigest(
     cases: latest.filter((r) => r.kind !== "statistic").length,
     statistics: latest.filter((r) => r.kind === "statistic").length,
     candidates: selected,
+    consumer: buildConsumerDigest(records, reviews, asOf),
     limits:
       "Muestra parcial de fuentes públicas. Las cuentas no son personas verificadas, las capturas no miden crecimiento del mercado y ninguna línea demuestra demanda o disposición a pagar.",
   };
@@ -202,6 +210,7 @@ export function researchDigestMarkdown(digest: ResearchDigest) {
     historical: "Antecedente histórico",
   };
   return [
+    ...(digest.consumer ? consumerDigestMarkdown(digest.consumer) : []),
     "## Investigación automática del Radar",
     "",
     `${digest.cases} casos distintos y ${digest.statistics} grupos estadísticos disponibles al corte; las estadísticas no cuentan como personas.`,

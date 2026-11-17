@@ -197,6 +197,7 @@ export function classifyIdeaEvidence(
     authorKey: record.authorKey,
     country: record.country,
     occurredAt: record.occurredAt,
+    ...(record.dateBasis ? { dateBasis: record.dateBasis } : {}),
     capturedAt: record.capturedAt,
     classifiedAt: now.toISOString(),
     mechanism:

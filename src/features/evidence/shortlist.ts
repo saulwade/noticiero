@@ -31,6 +31,7 @@ export function researchShortlist(
   const byId = new Map(records.map((r) => [r.id, r]));
   return dossiers
     .flatMap((d) => {
+      if (d.scope?.key.startsWith("consumer:")) return [];
       const active = d.evidenceIds.flatMap((id) => {
         const r = byId.get(id);
         return r && r.kind !== "statistic" && !problemContext(r).correction

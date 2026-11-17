@@ -104,10 +104,13 @@ export function assessIdea(
   });
   const active = current.filter((l) => l.quality === "problem");
   const currentWeek = active.filter(
-    (l) => Date.parse(l.occurredAt) >= cutoff - 7 * DAY,
+    (l) =>
+      l.dateBasis !== "source_updated" &&
+      Date.parse(l.occurredAt) >= cutoff - 7 * DAY,
   );
   const previousWeek = active.filter(
     (l) =>
+      l.dateBasis !== "source_updated" &&
       Date.parse(l.occurredAt) >= cutoff - 14 * DAY &&
       Date.parse(l.occurredAt) < cutoff - 7 * DAY,
   );
@@ -247,12 +250,23 @@ export function assessIdea(
       : [
           "Encontrar cuentas independientes con el mismo mecanismo; compartir palabras no basta.",
         ]),
-    ...(totals.mexicoCases
-      ? []
-      : [
-          "Comprobar vigencia y proceso en México/Latinoamérica; idioma no determina país.",
-        ]),
-    "Verificar organizaciones, comprador y disposición a pagar; ninguna cuenta pública se considera cliente validado.",
+    ...(idea.match.scopeKey?.startsWith("consumer:")
+      ? [
+          "Precisar el segmento de consumidores hispanohablantes y su contexto de uso; no se requiere México ni se infiere residencia.",
+        ]
+      : totals.mexicoCases
+        ? []
+        : [
+            "Comprobar vigencia y proceso en México/Latinoamérica; idioma no determina país.",
+          ]),
+    idea.match.scopeKey?.startsWith("consumer:")
+      ? "Verificar quién usaría y pagaría una solución; una cuenta o reseña no es un cliente validado."
+      : "Verificar organizaciones, comprador y disposición a pagar; ninguna cuenta pública se considera cliente validado.",
+    ...(current.some((l) => l.dateBasis === "source_updated")
+      ? [
+          "Las fechas de reseña corresponden a actualización de la fuente; no se contabilizan como publicaciones originales de esta semana.",
+        ]
+      : []),
     "Cuantificar con registros la frecuencia, las pérdidas y el costo de servir; las citas son afirmaciones sin auditoría.",
     "Contrastar alternativas existentes y preferencia por una solución nueva; no se demuestra un hueco por falta de datos.",
     ...(totals.resolved || totals.closedUnverified
